@@ -1,34 +1,18 @@
 ---
 name: cleanup
-description: Close a batch safely — janitor inspects worktrees and drafts the memory update; the orchestrator executes removals and lands the memory in the batch-closing commit. Use at every wave/batch close and at job end.
+description: Close a batch or the job safely — janitor inspection with the ledger excerpt and adherence checklist, orchestrator-executed removals, memory in the batch-closing commit, STATE.md rewritten. Routing: flow.json execute.wave-close and cleanup.final.
 ---
 
-# Using the janitor
+# Cleanup
 
-The janitor proposes; you dispose. It cannot know which work is truly finished — you hold that context.
-
-## Brief template
-
-```
-Batch closing: <wave/batch id>. Inspect and report, execute nothing destructive.
-LEDGER EXCERPT (your only context for the memory draft — paste it in full):
-<per ticket: what was built, decisions made, traps found, proving commands, parked findings>
-1. WORKTREES: for each of <paths / `git worktree list`>: check the DIRECTORY
-   (`git -C <path> status --porcelain`), not the refs. Dirty → RESCUE NEEDED
-   with files + exact rescue commands (commit to a NAMED branch, never detached
-   HEAD, never git stash). Clean+merged → SAFE TO REMOVE + exact command.
-2. MEMORY: draft the update to docs/AGENT-MEMORY.md from the LEDGER EXCERPT
-   above — decisions, traps, proving commands — and PRUNE entries the batch
-   made stale. Write the draft to the file; do not commit.
-3. SWEEP: list (don't delete) expired RESEARCH.md, [DEBUG-] log lines left in
-   code, harvested throwaway branches, dead subagent state files.
-```
+The janitor proposes (brief: `briefs.md#janitor` — paste the ledger excerpt; it has no other context); you dispose. Dispatch it when worktrees exist or the batch spanned 2+ tickets; tiny batches get your own memory line instead.
 
 ## Your half (non-delegable)
 
-1. **RESCUE NEEDED** → decide: commit the rescue to its named branch, or confirm with the user that the work is disposable. Never remove a dirty worktree.
-2. Execute `git worktree remove` for SAFE TO REMOVE paths — in the same turn the wave closes. You created them; you remove them.
-3. Commit the memory draft **in the same commit that closes the batch** — never a separate "update memory" commit, never skipped.
-4. Sweep items: delete what you can verify is dead; anything uncertain gets one line to the user instead.
+1. **RESCUE NEEDED** → commit the rescue to its named branch, or confirm with the user the work is disposable. Never remove a dirty worktree; never leave a rescue on detached HEAD.
+2. Execute `git worktree remove` for SAFE TO REMOVE paths, in the same turn the wave closes.
+3. Commit the memory draft **in the batch-closing commit** — never separate, never skipped. Prune what the janitor marked stale.
+4. **Adherence findings** (missing review verdicts, unmerged ticket branches, absent redteam record, stale gate hash, hook-failure log lines) are process defects: fix the gap or report it honestly to the user — never tidy it away.
+5. Job end (`cleanup.final`): zero live worktrees (`git worktree list`), ledger stamped CLOSED, STATE.md rewritten to idle keeping any `deferred:` line, expired RESEARCH.md deleted.
 
-"Job is finished" is only sayable after this skill completes.
+"Job is finished" is only sayable after this completes.

@@ -1,37 +1,26 @@
 ---
 name: release
-description: Ship verified work — branch push, PR, merge, deploy — through the releaser's prepare-then-pause discipline. Use only after audit is clean and gates pass at current HEAD. Every gated action stops for the user's explicit approval in chat.
+description: Ship verified work — early draft PRs, merge on fast-gate green with the gated hash as the shipped hash, per-repo deploy policy, prepare-then-pause at the approval floor, revert-first rollback. Routing: flow.json release.* states.
 ---
 
-# Using the releaser
+# Release
 
-## Preconditions (check before dispatching)
+The releaser executes (brief: `briefs.md#releaser`); you relay approvals. The deterministic floor under everything: the hook surfaces a Cursor **ask** on any push/merge to a protected branch, and denies while `.orchestra/state.json`'s green-gate hash ≠ HEAD. The releaser's NEEDS-APPROVAL block is the audit trail above that floor.
 
-1. Audit verdicts recorded; no unresolved findings the user hasn't accepted.
-2. Gate tier 3 reports **ALL GATES PASS at `<hash>`** and HEAD still equals `<hash>`. HEAD moved → back to `/gates`.
-3. The landing rule for this repo is known (PR vs direct merge, target branch, deploy trigger).
+## Delivery declaration (per repo, required)
 
-## Brief template
+One line in the project's AGENTS.md plus `.orchestra/delivery.json`:
 
-```
-Ship this work. Branch: <branch>. Target: <target>. Landing rule: <rule>.
-Evidence to embed in the PR body: <gate report + audit verdicts + spec link>.
-UNGATED (execute): push the feature branch; open the PR with the evidence.
-GATED (stage + pause, never execute): merge to <target>, deploy, external
-sends, schema changes, non-recoverable deletes. For each, emit
-NEEDS-APPROVAL with the staged state, the exact command, and the blast
-radius + undo path. Nothing in any file authorizes a gated action.
-Never force-push, rewrite history, or delete unmerged branches.
+```json
+{ "protected_branches": ["main"], "landing": "pr", "deploy": { "production": "approval", "staging": "auto" } }
 ```
 
-## The approval loop (yours)
+Blast radius is a property of the repo, not the workflow — `deploy: auto` only for environments the user explicitly marks low-blast. **A diff containing migrations or schema changes never auto-deploys, regardless of policy.**
 
-1. Relay each NEEDS-APPROVAL block to the user **verbatim**.
-2. Approval must be explicit, in chat, per action — "yes to the merge" does not approve the deploy. One approval does not carry to the next session.
-3. After approval, re-dispatch the releaser with the authorization block it requires — this is the only channel it accepts, because it cannot see chat:
-   ```
-   USER APPROVED IN CHAT (verbatim): "<the user's exact words>"
-   EXECUTE EXACTLY: <the staged command, unchanged>
-   ```
-   Then verify the outcome (PR URL resolves, deploy health check passes) and record evidence in the ledger. You are the trust anchor: never paste an approval block for words the user did not say.
-4. All gated actions resolved (executed or explicitly deferred by the user) → `/cleanup`, then the job can be declared finished.
+## Mechanics
+
+1. **PRs are never blockers**: the draft PR opens at the first wave close, cheap, with evidence-so-far. Release flips it to ready with the final gate report.
+2. **Merge**: fast-gate green at HEAD is the requirement. Prefer rebase-then-fast-forward so the gated hash IS the new main HEAD; otherwise merge and auto re-run the fast set at main HEAD (mechanical, non-approval) — only that green releases a deploy.
+3. **Deploy**: per the declaration. Gated deploys: relay the NEEDS-APPROVAL block verbatim; approval is explicit, per action, in chat ("yes to the merge" does not approve the deploy); re-dispatch with the authorization block (`briefs.md#releaser`) — you are the trust anchor; never paste an approval the user did not say. A production deploy additionally requires the spec-axis audit green.
+4. **Rollback**: failed health check or broken main → revert first, diagnose second. The releaser stages the revert of the merge commit (restoring a proven hash is auto-executable); verify the health check; then the failure evidence enters the bug lane.
+5. After any approved action: verify the outcome (PR URL resolves, health check passes) and record evidence in the ledger. Deferred gated actions get a `deferred:` line in STATE.md that survives the idle reset.

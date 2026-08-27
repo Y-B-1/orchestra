@@ -29,6 +29,10 @@ Write `RESEARCH.md` at the repo location the brief names (default: repo root, or
 
 Header must carry the expiry note — stale research misleads agents and must be deleted when the sprint ends. Return a short summary of the findings plus the file path as your final message.
 
-## Non-negotiable
+Non-negotiable: never spawn sub-agents (enforced by hook; all fan-out belongs to the orchestrator). Finish your brief and report back.
 
-Never spawn sub-agents of your own. Cursor allows one further level of nesting, but this system forbids it: all fan-out belongs to the orchestrator, or fresh-eyes and single-dispatcher guarantees break. Finish your brief and report back; the orchestrator dispatches any further work.
+## Levels (the brief names one; default L2)
+
+- **L1 spot-check**: one claim verified against one primary source; short answer, no RESEARCH.md file unless the brief asks.
+- **L2 standard**: full cited RESEARCH.md per the format below.
+- **L3 survey**: multiple libraries/standards compared, with a recommendation section.

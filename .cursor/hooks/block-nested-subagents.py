@@ -1,29 +1,37 @@
 #!/usr/bin/env python3
 """Cursor subagentStart hook: denies sub-agents spawning their own sub-agents.
 
-Since Cursor 2.5 a sub-agent may launch one further level of children. This
-system forbids that by policy: all fan-out belongs to the orchestrator (the
-main session), or fresh-eyes and single-dispatcher guarantees break.
+Policy, not platform: since Cursor 2.5 a sub-agent may launch one further level;
+this system forbids it — all fan-out belongs to the orchestrator.
 
-Mechanism: every subagentStart reports a parent conversation id. Ids we have
-seen spawned as children are recorded in a state file; a spawn whose parent is
-a recorded child is a nested spawn and is denied. Fails OPEN on any surprise
-(unknown payload shape, unreadable state file) so a hook bug cannot block the
-orchestrator's own legitimate dispatches.
+Mechanism: child conversation ids seen spawning are recorded in
+.orchestra/subagent-children.json; a spawn whose parent is a recorded child is
+nested and denied. Fails OPEN (allow) on payload surprises, but logs every
+fail-open to .orchestra/hook-failures.log so the janitor surfaces a disarmed
+hook instead of it dying silently after a Cursor update.
 """
 import json
 import os
 import sys
-import tempfile
 
-STATE = os.path.join(tempfile.gettempdir(), "orchestra-subagent-children.json")
+STATE = os.path.join(".orchestra", "subagent-children.json")
+LOG = os.path.join(".orchestra", "hook-failures.log")
 
 
-def respond(permission, agent_message=None):
+def log_failure(note):
+    try:
+        os.makedirs(".orchestra", exist_ok=True)
+        with open(LOG, "a") as f:
+            f.write(f"block-nested-subagents: {note}\n")
+    except Exception:
+        pass
+
+
+def respond(permission, msg=None):
     out = {"permission": permission}
-    if agent_message:
-        out["agent_message"] = agent_message
-        out["user_message"] = agent_message
+    if msg:
+        out["agent_message"] = msg
+        out["user_message"] = msg
     print(json.dumps(out))
     sys.exit(0)
 
@@ -31,6 +39,7 @@ def respond(permission, agent_message=None):
 try:
     payload = json.load(sys.stdin)
 except Exception:
+    log_failure("stdin parse failure")
     respond("allow")
 
 parent = (payload.get("parent_conversation_id")
@@ -38,25 +47,30 @@ parent = (payload.get("parent_conversation_id")
 child = (payload.get("conversation_id") or payload.get("conversationId")
          or payload.get("subagent_conversation_id") or "")
 
+if not parent and not child:
+    log_failure("payload had no recognizable conversation id fields — hook may be disarmed by a schema change")
+
 children = set()
 try:
     with open(STATE) as f:
         children = set(json.load(f))
-except Exception:
+except FileNotFoundError:
     pass
+except Exception:
+    log_failure("state file unreadable")
 
 if parent and parent in children:
     respond("deny",
-            "Orchestra policy: sub-agents must not spawn sub-agents. All fan-out "
-            "belongs to the orchestrator (main session). Finish your own brief and "
-            "report back; the orchestrator will dispatch any further work.")
+            "Orchestra policy: sub-agents must not spawn sub-agents. All fan-out belongs "
+            "to the orchestrator (main session). Finish your own brief and report back.")
 
 if child:
     children.add(child)
     try:
+        os.makedirs(".orchestra", exist_ok=True)
         with open(STATE, "w") as f:
             json.dump(sorted(children), f)
     except Exception:
-        pass
+        log_failure("state file unwritable")
 
 respond("allow")

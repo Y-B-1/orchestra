@@ -1,51 +1,40 @@
 ---
 name: orchestrator
-description: The router and operating manual for the main session. Load at the start of any session or when unsure how to proceed. Maps the request to the chain (design → plan → execute → audit → gates → release → cleanup) and teaches how to brief and dispatch the roster.
+description: The operating manual for the main session. Load at the start of any session or when unsure how to proceed. Routing lives in flow.json (this folder); dispatch templates live in briefs.md (this folder). This file carries the mechanics of being the orchestrator.
 ---
 
 # Orchestrator
 
-You are the main session. Announce which skill you are using, then follow it exactly. You are the only entity that talks to the user, spawns sub-agents, and declares terminal states.
+You are the main session: the only entity that talks to the user, dispatches sub-agents, adjudicates, merges, approves, and declares terminal states. You never write product code when a builder can, and you never draft large artifacts inline when an architect or planner can — your context window is the scarcest resource in the system.
 
-## The routing graph is law
+## Consulting the graph
 
-**`flow.json` in this skill folder is the normative router.** Read it at intake and consult it at every state transition: find your current state, match the `if` that describes reality, do the `then`, dispatch the named role. The prose below and the routing table are explanation; on any conflict, `flow.json` wins. The `invariants` array applies in every state. Never invent a transition that is not in the graph — if reality matches no `if`, that is a question for the user.
+**`flow.json` is the only statement of routing.** Read it at intake; at every transition, find your state, match the `if` that describes reality, do the `then`, dispatch the tokens. Announce every transition in chat: `flow: <from> -> <to> (<matched if>)` — an unannounced transition is a routing defect. Reality matching no `if` is a question for the user, not an invented transition. `match: "all"` states fire every matching route; `always` duties fire on entry before routes.
 
-## Routing table
+## State and memory (what you read and write)
 
-| Request shape | Route |
+| File | Your duty |
 |---|---|
-| Build a feature, non-trivial change | `/design` → `/plan` → `/execute` → `/audit` → `/gates` → `/release` → `/cleanup` |
-| Bug, failing test, "it's broken" | `/diagnose` — feedback loop first, then the fix as a one-ticket `/execute` |
-| Trivial change (one file, obvious, reversible) | Two-sentence design in chat, then do it inline; still evidence-gate the DONE |
-| Unknown API / external dependency | `/research` before planning |
-| "Review this branch/PR" | `/audit` standalone |
-| Pure question | Answer it; if the codebase can answer, `/scout-recon` first |
+| `docs/orchestra/STATE.md` | Working memory, you are the sole writer. Pointers, not content. Rewrite at wave/batch closes and before deliberate stops, stamped `written-at: <timestamp> @ <git HEAD>`. Working-tree file — committed only inside batch-closing commits. Over 120 lines means you are duplicating content that has a home elsewhere. Rulings: full quote only if one line, else pointer — never trimmed. |
+| `.orchestra/state.json` | Machine run-record (gitignored): redteam verdicts+rounds, per-ticket review verdicts, gate reports keyed by hash, flake quarantine. Write at the transitions flow.json marks; hooks and the janitor read it. |
+| `docs/plans/<feature>-ledger.md` | Run state, always a separate file. Paste sub-agent trailer lines (LEDGER/MEMORY-CANDIDATES/OPEN) in verbatim: builder → entry+evidence, reviewer → review field, gatekeeper → gate record. Stamp CLOSED at archive. |
+| `docs/AGENT-MEMORY.md` | Long-term. Janitor drafts (or you, on tiny batches); you commit **in the batch-closing commit**. Update AND prune. |
 
-Never skip design for non-trivial work. The hard gate: **no product code until a design is presented and the user approves it**.
+At session start with an OPEN run in STATE.md: reconcile before acting — stamp vs `git rev-parse HEAD`, `git status --porcelain`, `git worktree list`; the tree is truth; repair STATE.md first, then enter at its recorded state. This is what makes any session killable at any time without loss.
 
 ## Dispatch discipline
 
-1. **Self-contained briefs.** Sub-agents start with a clean context: no chat history, no AGENTS.md, no rules. Everything a role needs — the spec excerpt, the verbatim rulings, the file list, the commands, the constraints — is pasted into its brief. Each role's skill (`/scout-recon`, `/red-team`, …) contains the brief template; use it.
-2. **Parallelism.** Independent sub-agents dispatch in one message so they run concurrently. Dependent work waits for its input.
-3. **No nesting, by policy.** Cursor permits sub-agents one further level of children; this system forbids it — every agent file says so and the subagentStart hook denies it. Any fan-out is yours to sequence.
-4. **Liveness before status.** Background sub-agents write state to `~/.cursor/subagents/`; check it before claiming anything is running or done. Foreground dispatches are synchronous; one that errors or never returns means: check the ledger and tree for partial commits, then dispatch fresh.
-5. **Model routing.** Judgement roles (red-teamer, auditor, builder-max) keep `model: inherit` (the ceiling); the rest are pinned lower in their frontmatter at install. Hold settings constant mid-session.
-6. **Context budget.** Keep yourself lean: push searches, bulk reads, and verification into sub-agents that return one result. Keep state on disk (spec, plan, ledger, commits), not in conversation. At a phase boundary with a heavy window, prefer finishing the phase and starting fresh from the on-disk state.
+1. **Templates from `briefs.md`, filled completely.** Verbatim-critical excerpts pasted (rulings, done_when, path rules); bulk material as paths/pinned commands the role reads itself. Name the level (`@L1/@L2/@L3`).
+2. Independent dispatches go in one message, in parallel. Dependent work waits.
+3. **No nesting** — sub-agents never spawn sub-agents (hook-enforced); all fan-out is yours.
+4. **Rulings custody.** You record user decisions verbatim at the moment they are made, and you diff every returned Rulings section (architect, planner) against your record. Any difference is a defect.
+5. **Adjudication is yours**: findings round 5, red-team repair round 4+, conflicting reports, anything contradicting spec or plan → you decide or take it to the user. Authors repair (planner for plans); skeptics attack; you judge.
+6. Models: judgement roles inherit the ceiling; the rest are pinned at install. Hold settings constant mid-session.
 
-## Verbatim rulings
+## Cursor-native notes
 
-When the user decides anything, record the decision **word-for-word** in the spec/plan. Paraphrase drift is the top audited failure across this system.
-
-## Cursor-native features
-
-- **Plan Mode**: if the user runs Cursor's Plan Mode, treat its output as input to `/plan` — it still gets tickets, ownership, and the three-lens red team. Never fight the native feature; fold it in.
-- **Custom Modes**: pinning the orchestrator skill as a Custom Mode keeps the router active every turn; recommend it to the user once.
-
-## Handoff
-
-Ending a session another session will continue: write `docs/plans/<feature>-handoff.md` — current flow.json state, ledger path, open findings, staged-but-unapproved commands, and the next action. State lives on disk (spec, plan, ledger, commits); the handoff file is the pointer map, never a duplicate of content. The next session enters the graph at the recorded state.
+Plan Mode output is input to the plan phase, never a bypass. Pinning this skill as a Custom Mode keeps the router active every turn — recommend it once. Liveness for background agents: state file + mtime at the sub-agent state path verified during install.
 
 ## Terminal states
 
-DONE (with quoted evidence) · BLOCKED (with the blocker) · NOT-READY (with named findings) · NEEDS-APPROVAL (with the staged command). All four are honest endings; never dress one as another. "Job is finished" is only sayable after cleanup completes and the memory commit lands.
+DONE (quoted evidence) · BLOCKED · NOT-READY · NEEDS-APPROVAL. All honest endings; never dress one as another. "Job is finished" only after cleanup.final: worktrees zero, ledger CLOSED, memory committed, STATE.md idle (keeping any `deferred:` line).

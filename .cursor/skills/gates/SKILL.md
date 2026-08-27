@@ -1,37 +1,22 @@
 ---
 name: gates
-description: How to brief the gatekeeper for each verification tier — fast per-wave, scoped e2e per unit, derived pre-merge set, full suite only on explicit order. Gate evidence is exit codes at a named commit; any later commit voids it.
+description: Verification policy — one always-on fast set (lint, typecheck, scoped unit, smoke core, framework doctor, scoped e2e on flow changes), mechanical scope widening, flake quarantine, and a detached user-triggered full suite. Routing: flow.json gates.fast and fullsuite.run.
 ---
 
-# Using the gatekeeper
+# Gates
 
-Match the tier to the blast radius. Never escalate a tier out of anxiety; never skip one out of optimism.
+Three sets. The gatekeeper executes and reports (brief: `briefs.md#gatekeeper`); **you derive and approve every command list** — scoping is never the gatekeeper's guess, and commands come from the recon's verified tooling list.
 
-| Tier | When | Contents |
+| Set | When | Contents |
 |---|---|---|
-| 0 Re-proof | a reviewer flags implausible builder evidence | that one ticket's done_when command, nothing else |
-| 1 Fast | every wave close | lint + typecheck + unit tests scoped to changed surface |
-| 2 Scoped e2e | per wave with a user-facing flow | the e2e specs covering changed flows, isolated port |
-| 3 Derived pre-merge | before release prep | changed-surface specs + smoke core, derived from the actual diff |
-| 4 Full suite | ONLY on the user's explicit order | everything; run in a quiet worktree, a background run, or a Cursor cloud agent — never on the critical path |
+| **Fast** | every wave close; the merge requirement | lint + typecheck + scoped unit + smoke core + framework doctor (e.g. React Doctor on React repos) + scoped e2e when a user-facing flow changed (isolated port) |
+| **Re-proof** | reviewer flags implausible evidence | that one ticket's done_when, nothing else |
+| **Full** | ONLY user-triggered (or scheduled, if the user sets that up) | whole codebase, on main, quiet worktree or Cursor cloud agent — never on the critical path, never blocking a PR |
 
-## Brief template
+## Rules
 
-```
-TIER <n>. Commit under test: <hash>. Run exactly:
-1. <command>
-2. <command>
-For tier 3: derive the spec set from this diff file list and state your mapping:
-<files>
-Report per command: verbatim command, exit code, PASS/FAIL/FLAKY, failure
-excerpt. Run every command as `cmd > /tmp/gate-N.log 2>&1; echo exit:$?`;
-never pipe through grep/tail. Do not fix anything, even trivially. A named
-command that doesn't exist is a finding. End: ALL GATES PASS at <hash> or
-BLOCKED: <gate>.
-```
-
-## Consuming the report
-
-- FAIL → findings loop to a builder; then **re-run the tier** (the old green is void).
-- FLAKY → a finding in its own right; ticket it, do not loop-until-green.
-- ALL GATES PASS at `<hash>` → record hash + report in the ledger; HEAD must still equal that hash when `/release` stages the merge.
+- **Mechanical widening, not judgment**: a diff touching dependency manifests, build/tsconfig, migrations/schema, shared types/tokens, or auth middleware widens the scoped set. This list lives in your derivation step.
+- **Record every report into `.orchestra/state.json` keyed by commit hash.** The hook denies protected-branch pushes while the recorded green hash ≠ HEAD.
+- **Voiding is mechanical**: `git diff --stat <green-hash>..HEAD -- ':!docs' ':!*.md'` non-empty = void, re-run; docs/memory-only commits do not void. No judgment allowed either direction.
+- **FLAKY = quarantine, not a question**: first occurrence → ship allowed, flake ticketed and quarantined in state.json; second occurrence of the same flake → mandatory fix ticket before that surface merges again. Never loop-until-green; never ask the user per flake after the first.
+- Full-suite failures become intake items (bug lane), prioritized with the user — the run itself never blocks anything.

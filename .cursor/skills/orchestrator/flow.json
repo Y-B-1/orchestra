@@ -1,237 +1,311 @@
 {
-  "version": 1,
+  "version": 2,
   "title": "Orchestra routing graph",
-  "authority": "This file is the normative router. The orchestrator consults it at intake and at every state transition. Prose in SKILL.md explains it; on conflict, this file wins. Sub-agents never read this file — their briefs are self-contained.",
+  "schema": {
+    "route_fields": "if (prose predicate) · then (string step, or array = parallel batch) · dispatch (tokens role[:lens][@level], resolvable against roles; @L2 default) · next (forward edge, must name a real state) · back_to + carry (backward edge + what travels back)",
+    "state_fields": "question · always (duties that fire on every entry, before route matching) · routes · match ('first' default = exclusive; 'all' = every matching route fires, at most one names next)",
+    "announce": "Every transition is announced in chat as `flow: <from> -> <to> (<matched if>)`. A transition without an announcement is a routing defect.",
+    "validate": "python3 -c \"import json;d=json.load(open('.cursor/skills/orchestrator/flow.json'));s=set(d['states']);bad=[(k,e) for k,v in d['states'].items() for r in v.get('routes',[]) for e in [r.get('next'),r.get('back_to')] if e and e not in s];print(bad or 'edges ok')\""
+  },
   "entry": "intake",
   "roles": {
-    "orchestrator": "main session — only role that talks to the user, spawns sub-agents, declares terminal states",
-    "scout": ".cursor/agents/scout.md — read-only recon",
-    "researcher": ".cursor/agents/researcher.md — primary-source research, background",
-    "red-teamer": ".cursor/agents/red-teamer.md — one lens per dispatch: requirements | feasibility | scope | judge",
-    "builder": ".cursor/agents/builder.md — one ticket, TDD, fresh per ticket",
-    "builder-max": ".cursor/agents/builder-max.md — escalation builder at the strongest tier, findings-loop round 4 only",
-    "reviewer": ".cursor/agents/reviewer.md — per-ticket diff-vs-ticket, fresh per ticket",
-    "auditor": ".cursor/agents/auditor.md — one axis per dispatch: standards | spec",
-    "gatekeeper": ".cursor/agents/gatekeeper.md — runs gates, honest exit codes",
-    "janitor": ".cursor/agents/janitor.md — inspects, drafts, proposes; never removes",
-    "releaser": ".cursor/agents/releaser.md — prepare-then-pause shipping"
+    "orchestrator": "main session — talks to the user, dispatches everyone, adjudicates, merges, approves, owns memory",
+    "scout": ".cursor/agents/scout.md",
+    "researcher": ".cursor/agents/researcher.md",
+    "architect": ".cursor/agents/architect.md",
+    "planner": ".cursor/agents/planner.md",
+    "red-teamer": ".cursor/agents/red-teamer.md",
+    "builder": ".cursor/agents/builder.md",
+    "builder-max": ".cursor/agents/builder-max.md",
+    "reviewer": ".cursor/agents/reviewer.md",
+    "auditor": ".cursor/agents/auditor.md",
+    "gatekeeper": ".cursor/agents/gatekeeper.md",
+    "janitor": ".cursor/agents/janitor.md",
+    "releaser": ".cursor/agents/releaser.md"
+  },
+  "levels": "Dispatch tokens carry @L1 (minimal) / @L2 (standard, default) / @L3 (deep). Each agent file defines what its levels mean — the level contract travels in the brief. Which roles fire in which state, and at what level, IS the activation model; there is no separate matrix.",
+  "state_files": {
+    "docs/orchestra/STATE.md": "working memory — orchestrator sole writer; pointers not content; rewritten at wave/batch closes and before deliberate stops; stamped `written-at: <timestamp> @ <git HEAD>`; working-tree file, committed only inside batch-closing commits; 120-line cap is a smoke alarm (over = you are duplicating content that has a home), never an eviction trigger; verbatim quotes only when a ruling fits one line, else pointer only — never a trimmed quote",
+    ".orchestra/state.json": "machine run-record (gitignored) — redteam verdicts+rounds, per-ticket review verdicts, gate reports keyed by commit hash, flake quarantine list; written by the orchestrator at transitions; read by hooks (gate freshness) and the janitor (process-adherence checklist)",
+    "docs/plans/<feature>-ledger.md": "run state for one plan — always a separate file, never a section in the plan; CLOSED stamp at archive",
+    "docs/AGENT-MEMORY.md": "long-term repo memory — path/topic-tagged entries; janitor drafts, orchestrator commits in the batch-closing commit; update AND prune (git is the history — no append-only markers)"
   },
   "states": {
     "intake": {
-      "question": "What shape is the request?",
+      "question": "What shape is the request, and is there an open run to resume?",
+      "match": "all",
       "routes": [
-        { "if": "non-trivial feature or change (new behavior, multiple files, or hard to reverse)", "then": "design.recon" },
-        { "if": "bug, failing test, regression, or 'it's slow'", "then": "bug.feedback-loop" },
-        { "if": "trivial change: one file, obvious, reversible", "then": "trivial.inline" },
-        { "if": "question the codebase can answer", "then": "dispatch scout, answer from its report, END", "dispatch": "scout" },
-        { "if": "question about an external API, dependency version, or standard", "then": "dispatch researcher, answer from RESEARCH.md, END", "dispatch": "researcher" },
-        { "if": "'review this branch/PR'", "then": "audit.prepare" },
-        { "if": "ambiguous which of the above", "then": "ask the user one classification question with a recommended answer; do NOT start work" }
-      ]
-    },
-
-    "design.recon": {
-      "question": "Can the codebase answer any open question about this request?",
-      "routes": [
-        { "if": "yes", "then": "dispatch scout(s) in parallel for every such question, then design.frontier", "dispatch": "scout" },
-        { "if": "no open codebase questions", "then": "design.frontier" }
-      ],
-      "invariant": "Never ask the user what the codebase can answer. No product code in any design state."
-    },
-    "design.frontier": {
-      "question": "Are there unsettled questions only the user can decide?",
-      "routes": [
-        { "if": "yes", "then": "ask ALL questions whose prerequisites are settled in one round, numbered, each with a recommended answer; record every ruling VERBATIM; repeat until none remain", "loop": "design.frontier" },
-        { "if": "a question is a fact, not a decision", "then": "route it to scout or researcher instead of the user", "dispatch": "scout | researcher" },
-        { "if": "no unsettled decisions", "then": "design.approaches" }
-      ]
-    },
-    "design.approaches": {
-      "question": "Is the solution space explored?",
-      "routes": [
-        { "if": "standard shape", "then": "present 2–3 approaches with trade-offs and ONE recommendation, then design.spec" },
-        { "if": "a hard-to-reverse module interface exists", "then": "additionally: sketch 2–3 radically different interfaces, dispatch red-teamer(judge) to compare on depth/locality/seams, fold the winner into the recommendation, then design.spec", "dispatch": "red-teamer:judge" },
-        { "if": "a question only running code can answer", "then": "additionally: build a throwaway prototype on a disposable, clearly-marked branch (no polish, no persistence, one command to run), harvest the answer, record the ruling, then design.spec" },
-        { "if": "design leans on an industry standard or post-cutoff API", "then": "additionally: queue researcher for the plan phase, then design.spec", "dispatch": "researcher (background)" }
-      ]
-    },
-    "design.spec": {
-      "question": "Is the spec written and self-reviewed?",
-      "routes": [
-        { "if": "spec drafted", "then": "self-review: placeholders, contradictions, dual-readable requirements, scope creep; fix; then design.user-gate" }
-      ],
-      "artifact": "docs/specs/YYYY-MM-DD-<topic>-design.md with a verbatim Rulings section"
-    },
-    "design.user-gate": {
-      "question": "Did the user explicitly approve the spec?",
-      "routes": [
-        { "if": "approved", "then": "plan.recon" },
-        { "if": "changes requested", "then": "apply, re-record rulings verbatim, back to design.user-gate" },
-        { "if": "silence or ambiguity", "then": "ask; approval is never inferred" }
-      ],
-      "gate": "HARD: no product code before this gate passes."
-    },
-
-    "plan.recon": {
-      "routes": [
-        { "if": "always", "then": "dispatch scout to map spec vs codebase (files, symbols, conventions, exact verification commands), then plan.research", "dispatch": "scout" }
-      ]
-    },
-    "plan.research": {
-      "question": "Was research queued, or does any ticket touch a version-sensitive API?",
-      "routes": [
-        { "if": "yes", "then": "dispatch researcher (background); draft unaffected tickets meanwhile, but a ticket that depends on the research is not finalized until RESEARCH.md exists on disk and is cited — check the file before plan.redteam; plans never cite model memory", "dispatch": "researcher" },
-        { "if": "no", "then": "plan.draft" }
-      ]
-    },
-    "plan.draft": {
-      "routes": [
-        { "if": "always", "then": "draft tracer-bullet tickets: exact files owned (no overlaps without blocking edges), test-first, mechanical done_when + guards, scoped verification, blocking edges, model tier, self-contained brief text; then plan.redteam" }
-      ],
-      "artifact": "docs/plans/YYYY-MM-DD-<feature>.md"
-    },
-    "plan.redteam": {
-      "question": "Do all three lenses return READY?",
-      "routes": [
-        { "if": "entry", "then": "dispatch red-teamer ×3 in parallel, fresh context: requirements (spec+rulings pasted), feasibility (must name breaking file/symbol), scope (ownership traps, missing edges, hidden migrations, unguarded irreversibles)", "dispatch": "red-teamer:requirements + red-teamer:feasibility + red-teamer:scope" },
-        { "if": "any lens NOT-READY", "then": "orchestrator repairs the plan, re-dispatch ONLY the failed lens fresh; loop", "loop": "plan.redteam" },
-        { "if": "all READY on the FIRST round of a non-trivial plan", "then": "suspect the skeptics: tighten briefs (paste rulings, name diff surface), rerun once; then proceed" },
-        { "if": "all READY", "then": "execute.setup" }
-      ]
-    },
-
-    "execute.setup": {
-      "question": "How many builders will edit concurrently this wave?",
-      "routes": [
-        { "if": "1", "then": "main tree, no worktree; execute.ticket-loop" },
-        { "if": "2 or more", "then": "one worktree per builder (git worktree add <repo>/.cursor/worktrees/<ticket> -b <ticket-branch>; check you are not already inside one; gitignore .cursor/worktrees/); install dependencies and PROVE each toolchain before dispatch; own ports per tree; then execute.ticket-loop" },
-        { "if": "a worktree's toolchain proof fails and one repair attempt does not fix it", "then": "collapse the wave to sequential builders in the main tree — never dispatch into a broken tree" }
-      ],
-      "invariant": "Never git stash while worktrees exist. Ledger on disk before first dispatch."
-    },
-    "execute.ticket-loop": {
-      "question": "Is there an unblocked ticket?",
-      "routes": [
-        { "if": "yes", "then": "dispatch fresh builder with the ticket's complete self-contained brief; mark running only after dispatch returns an id; on report, execute.review", "dispatch": "builder" },
-        { "if": "several independent tickets", "then": "dispatch their builders in parallel (worktree rule applies)", "dispatch": "builder ×N" },
-        { "if": "builder reports BLOCKED", "then": "resolve the blocker (missing file ownership → amend plan; contradicts plan → user), then re-dispatch" },
-        { "if": "no tickets remain", "then": "execute.integrate" }
-      ]
-    },
-    "execute.review": {
-      "question": "What does the fresh reviewer say about this ticket's diff?",
-      "routes": [
-        { "if": "entry", "then": "dispatch fresh reviewer with ticket + diff + builder's claimed evidence", "dispatch": "reviewer" },
-        { "if": "PASS", "then": "ledger: complete with evidence; back to execute.ticket-loop" },
-        { "if": "reviewer flags the builder's evidence as implausible", "then": "dispatch gatekeeper tier 0 (that one ticket's done_when command only) for an honest re-proof before deciding the round", "dispatch": "gatekeeper" },
-        { "if": "FINDINGS, rounds 1–3", "then": "resume the SAME builder with findings; re-review", "loop": "execute.review" },
-        { "if": "FINDINGS, round 4", "then": "dispatch builder-max (escalation builder, strongest tier) with ticket + full findings history; re-review", "dispatch": "builder-max" },
-        { "if": "FINDINGS, round 5", "then": "orchestrator adjudicates: fix inline decision, park in ledger as known issue, or ticket BLOCKED" },
-        { "if": "ESCALATE: contradicts plan/spec", "then": "take it to the USER verbatim with a recommendation; never into the loop" }
-      ],
-      "invariant": "Builder success reports are never evidence. Builder and reviewer of one ticket are never the same run."
-    },
-    "execute.integrate": {
-      "question": "Are all the wave's reviewed ticket branches merged into the feature branch?",
-      "routes": [
-        { "if": "all reviews PASS", "then": "orchestrator merges each ticket branch into the feature branch in the main tree, ordered by blocking edges; then execute.wave-close" },
-        { "if": "merge conflict, resolvable", "then": "resolve it yourself: understand both tickets' intent, preserve both, never --abort, never invent behavior; continue merging" },
-        { "if": "merge conflict, too entangled", "then": "fresh builder as a findings round with both tickets pasted in the brief; then continue merging", "dispatch": "builder" }
-      ],
-      "invariant": "The lone-builder wave (no worktrees, work already on the feature branch) skips straight to execute.wave-close."
-    },
-    "execute.wave-close": {
-      "routes": [
-        { "if": "step 1, always", "then": "cleanup.batch: janitor inspects (brief pastes the wave's ledger excerpt); orchestrator rescues/removes worktrees and commits the memory draft in this batch-closing commit", "dispatch": "janitor" },
-        { "if": "step 2, always", "then": "gates tier 1 (fast, scoped) at the post-merge, post-memory HEAD — the hash that ships; FAIL → findings loop (lone builder in main tree) → re-run tier; PASS → next wave or audit.prepare", "dispatch": "gatekeeper" },
-        { "if": "step 2 addition: wave changed user-facing flows", "then": "gates tier 2 (scoped e2e, isolated port) as well", "dispatch": "gatekeeper" }
-      ],
-      "invariant": "Any commit after a green gate voids it — gate last, at the final HEAD."
-    },
-
-    "audit.prepare": {
-      "routes": [
-        { "if": "always", "then": "pin fixed point (git rev-parse; fail on bad ref/empty diff); collect standards files and the spec; then audit.run" }
-      ]
-    },
-    "audit.run": {
-      "question": "What do the two axes report?",
-      "routes": [
-        { "if": "entry", "then": "dispatch auditor(standards) + auditor(spec) IN PARALLEL, materials pasted in full; present both reports verbatim, never merged", "dispatch": "auditor:standards + auditor:spec" },
-        { "if": "findings", "then": "verify each yourself; route real ones to builders via execute.review loop; spec-contradicting ones to the user; then re-audit the touched surface" },
-        { "if": "standalone review request (entered from intake; no execution phase ran)", "then": "present both reports verbatim with per-axis worst-issue lines; terminal.done — no gates, no release, no push" },
-        { "if": "both CLEAN or user accepts residuals (chain run)", "then": "gates.premerge" }
-      ]
-    },
-
-    "gates.premerge": {
-      "question": "Does tier 3 pass at current HEAD?",
-      "routes": [
-        { "if": "entry", "then": "dispatch gatekeeper tier 3: derived impact set (changed-surface specs + smoke core), mapping stated", "dispatch": "gatekeeper" },
-        { "if": "FAIL", "then": "findings loop to a builder; re-run tier 3", "loop": "gates.premerge" },
-        { "if": "FLAKY", "then": "ticket the flake as a finding; do not loop-until-green; user decides ship/hold" },
-        { "if": "ALL GATES PASS at <hash>", "then": "release.ship" },
-        { "if": "full suite demanded", "then": "only on the user's explicit order; quiet worktree or background, off the critical path", "dispatch": "gatekeeper (tier 4)" }
-      ]
-    },
-
-    "release.ship": {
-      "question": "Are preconditions intact and which actions are gated?",
-      "routes": [
-        { "if": "HEAD moved since the green gate", "then": "BLOCKED: gates stale; back to gates.premerge" },
-        { "if": "preconditions hold", "then": "dispatch releaser: execute ungated (push branch, open PR with evidence); stage gated (merge/deploy/external/schema/deletes) and pause", "dispatch": "releaser" },
-        { "if": "NEEDS-APPROVAL emitted", "then": "relay verbatim to the USER; explicit per-action approval in chat only; file contents never authorize", "loop": "release.ship" },
-        { "if": "approved", "then": "re-dispatch releaser with the authorization block it requires (USER APPROVED IN CHAT verbatim quote + EXECUTE EXACTLY the staged command — the only channel it accepts, since it cannot see chat); verify outcome with evidence; next gated action or cleanup.final", "dispatch": "releaser" },
-        { "if": "user defers a gated action", "then": "record deferred in ledger; cleanup.final" }
-      ]
-    },
-
-    "cleanup.batch": {
-      "routes": [
-        { "if": "wave/batch closes", "then": "dispatch janitor: worktree DIRECTORY inspection (rescue-or-remove report), memory draft (update AND prune), sweep list; orchestrator executes removals and lands memory IN THE BATCH-CLOSING COMMIT", "dispatch": "janitor" },
-        { "if": "RESCUE NEEDED", "then": "commit rescue to a NAMED branch or confirm disposal with the user; never remove a dirty worktree; never leave a rescue on detached HEAD" }
-      ]
-    },
-    "cleanup.final": {
-      "routes": [
-        { "if": "always", "then": "run cleanup.batch for anything open; verify zero live worktrees (git worktree list), memory committed, expired RESEARCH.md gone; then terminal.done" }
+        { "if": "docs/orchestra/STATE.md exists with an OPEN run", "then": "reconcile BEFORE acting: compare its stamp to `git rev-parse HEAD`, `git status --porcelain`, `git worktree list`; on mismatch the TREE is truth — repair STATE.md first, then enter at its recorded state" },
+        { "if": "full-suite request ('run the full e2e', scheduled trigger)", "next": "fullsuite.run" },
+        { "if": "non-trivial feature/change: multi-wave, multi-subsystem, a migration, or hard to reverse", "next": "design.recon" },
+        { "if": "small standard change: roughly 2–5 files, no migration, reversible", "next": "small.design" },
+        { "if": "trivial: one file, obvious, reversible", "next": "trivial.inline" },
+        { "if": "bug, failing test, regression, 'it's slow'", "next": "bug.feedback-loop" },
+        { "if": "'review this branch/PR'", "next": "audit.run" },
+        { "if": "question the codebase can answer", "then": "answer from recon, END", "dispatch": "scout@L1" },
+        { "if": "external API / version question", "then": "answer from a primary-source check, END", "dispatch": "researcher@L1" },
+        { "if": "ambiguous between lanes", "then": "one classification question to the user with a recommendation; no work starts" }
       ]
     },
 
     "trivial.inline": {
       "routes": [
-        { "if": "always", "then": "two-sentence design in chat; implement inline; evidence-gate the DONE (command + exit code); memory note if a trap was found; END" }
-      ],
-      "invariant": "If it grows past one file or one surprise, stop and re-enter at design.recon."
+        { "if": "always", "then": "two-sentence design in chat; implement inline; evidence-gated DONE (command + exit code); END — no STATE.md obligation" },
+        { "if": "it grows past one file or one surprise", "back_to": "intake", "carry": "reclassify into small.design or design.recon" }
+      ]
+    },
+
+    "small.design": {
+      "question": "Small lane: is the approach agreed in chat?",
+      "always": ["Recon first when the code can answer (scout@L1); never ask the user what the codebase knows."],
+      "routes": [
+        { "if": "approach stated in chat and user explicitly OKs it", "next": "small.build" },
+        { "if": "a surprise, ownership conflict, or irreversible step appears", "back_to": "intake", "carry": "promote to the full chain (design.recon)" }
+      ]
+    },
+    "small.build": {
+      "always": ["One fresh builder in the main tree, complete self-contained brief (template: briefs.md).", "One fresh reviewer on the diff; findings loop rules apply (rounds 1–3 same builder, 4 builder-max, 5 adjudicate)."],
+      "dispatch": "builder + reviewer",
+      "routes": [
+        { "if": "review PASS", "next": "small.close" },
+        { "if": "reviewer flags implausible evidence", "then": "gatekeeper re-proof of that done_when only", "dispatch": "gatekeeper:tier-reproof@L1" }
+      ]
+    },
+    "small.close": {
+      "always": ["gates.fast set at HEAD (see gates.fast contents).", "Rewrite STATE.md if an open run exists; memory line to docs/AGENT-MEMORY.md only if a trap was found."],
+      "dispatch": "gatekeeper@L1",
+      "routes": [
+        { "if": "gate green and the repo lands via PRs", "then": "open the PR with evidence (ungated)", "dispatch": "releaser@L1", "next": "release.merge" },
+        { "if": "gate green, no PR flow", "next": "terminal.done" },
+        { "if": "gate FAIL", "back_to": "small.build", "carry": "the failing gate excerpt as findings" }
+      ]
+    },
+
+    "design.recon": {
+      "always": ["No product code in any design state (throwaway prototype code on a clearly-marked disposable branch is not product code).", "Record every user decision verbatim, at the moment it is made."],
+      "routes": [
+        { "if": "the codebase can answer open questions", "then": "dispatch scouts in parallel for all of them", "dispatch": "scout@L2", "next": "design.frontier" },
+        { "if": "no open codebase questions", "next": "design.frontier" }
+      ]
+    },
+    "design.frontier": {
+      "question": "Are there unsettled questions only the user can decide?",
+      "routes": [
+        { "if": "yes", "then": "ask ALL questions whose prerequisites are settled in one round, numbered, each with a recommended answer; loop until none remain" },
+        { "if": "a question is a fact, not a decision", "then": "route it to recon or research instead of the user", "dispatch": "scout@L1 | researcher@L1" },
+        { "if": "none remain", "next": "design.approaches" }
+      ]
+    },
+    "design.approaches": {
+      "question": "Is the solution space explored?",
+      "match": "all",
+      "routes": [
+        { "if": "standard shape", "then": "present 2–3 approaches with trade-offs and ONE recommendation", "next": "design.spec" },
+        { "if": "a hard-to-reverse module interface exists", "then": ["architect sketches 2–3 radically different interfaces in parallel", "red-teamer:judge compares on depth/locality/seams"], "dispatch": "architect:sketch@L2 + red-teamer:judge@L2" },
+        { "if": "a question only running code can answer", "then": "throwaway prototype on a disposable branch (clearly marked, one command to run, no polish); harvest the answer; record the ruling" },
+        { "if": "design leans on an industry standard or post-cutoff API", "then": "queue researcher (background) for the plan phase", "dispatch": "researcher@L2" }
+      ]
+    },
+    "design.spec": {
+      "question": "Is the spec drafted?",
+      "routes": [
+        { "if": "3+ rulings or more than one approach explored", "then": "architect drafts the spec from recon + winning approach + verbatim rulings; diff its returned Rulings section against your record — any difference is a defect", "dispatch": "architect:spec@L2", "next": "design.gate" },
+        { "if": "small design (fewer than ~3 rulings, one approach)", "then": "orchestrator drafts inline and says so; self-review for placeholders, contradictions, dual-readable lines, scope creep", "next": "design.gate" }
+      ]
+    },
+    "design.gate": {
+      "question": "Did the user explicitly approve the spec?",
+      "always": ["Red-team spot-check before presenting: requirements lens on the spec vs the verbatim rulings.", "Approval is never inferred."],
+      "dispatch": "red-teamer:requirements@L1",
+      "routes": [
+        { "if": "spot-check finds ruling drift", "back_to": "design.spec", "carry": "the drift findings (architect L1 revision)" },
+        { "if": "user approves", "then": "commit the spec — it is the contract every later phase cites", "next": "plan.recon" },
+        { "if": "changes requested", "back_to": "design.spec", "carry": "the user's words, verbatim, as new rulings" }
+      ]
+    },
+
+    "plan.recon": {
+      "question": "Does planning need recon beyond what design already gathered?",
+      "routes": [
+        { "if": "design recon left open questions, ticket briefs need a path-rule harvest, or design happened in a previous session", "then": "scout maps the gaps + harvests .cursor/rules and AGENTS.md excerpts for the touched paths", "dispatch": "scout@L2", "next": "plan.draft" },
+        { "if": "design recon suffices", "then": "carry it forward and say so in the plan", "next": "plan.draft" }
+      ]
+    },
+    "plan.draft": {
+      "always": ["Version-sensitive claims cite RESEARCH.md on disk — a ticket depending on research that does not exist yet is BLOCKED-ON-RESEARCH, not guessed."],
+      "routes": [
+        { "if": "always", "then": "planner drafts the ticketed plan from spec + recon + research (brief template: briefs.md); orchestrator reviews the ticket summary and diffs quoted rulings against its record", "dispatch": "planner@L2", "next": "plan.redteam" }
+      ]
+    },
+    "plan.redteam": {
+      "question": "Do all three lenses return READY?",
+      "always": ["Record verdicts, rounds, and run ids into .orchestra/state.json — the plan is not executable without a redteam record."],
+      "routes": [
+        { "if": "entry", "then": "three red-teamers in parallel, fresh context, one lens each: requirements (spec+rulings pasted) · feasibility (must name a breaking file/symbol) · scope (ownership traps, missing edges, hidden migrations, unguarded irreversibles)", "dispatch": "red-teamer:requirements@L2 + red-teamer:feasibility@L2 + red-teamer:scope@L2" },
+        { "if": "any lens NOT-READY, repair rounds 1–3", "back_to": "plan.draft", "carry": "ONLY the failed lens's findings to the planner; re-dispatch ONLY that lens after repair, fresh context" },
+        { "if": "repair round 4+", "then": "orchestrator adjudicates: repair inline, park with the user, or NOT-READY as the honest terminal state" },
+        { "if": "a finding contradicts the spec", "then": "to the USER verbatim with a recommendation — never silently repaired" },
+        { "if": "all READY with ZERO findings on round 1 of a large or irreversible plan", "then": "suspect the skeptics: tighten briefs (paste rulings, name the diff surface), rerun once; READY-with-minor-findings is a normal first-round outcome and is accepted" },
+        { "if": "all READY", "then": "commit the plan", "next": "execute.setup" }
+      ]
+    },
+
+    "execute.setup": {
+      "question": "How many builders will edit concurrently this wave?",
+      "always": ["Ledger file (docs/plans/<feature>-ledger.md) exists before the first dispatch.", "Never git stash while worktrees exist."],
+      "routes": [
+        { "if": "1", "then": "main tree, no worktree", "next": "execute.ticket-loop" },
+        { "if": "2+", "then": "one worktree per builder (git worktree add <repo>/.cursor/worktrees/<ticket> -b <ticket-branch>; check you are not already inside one; .cursor/worktrees/ gitignored); install dependencies and PROVE each toolchain before dispatch; own ports per tree", "next": "execute.ticket-loop" },
+        { "if": "a worktree's toolchain proof fails and one repair attempt does not fix it", "then": "collapse the wave to sequential builders in the main tree — never dispatch into a broken tree", "next": "execute.ticket-loop" }
+      ]
+    },
+    "execute.ticket-loop": {
+      "question": "Is there an unblocked ticket?",
+      "routes": [
+        { "if": "yes (several independent → parallel, worktree rule applies)", "then": "fresh builder per ticket with its complete self-contained brief; ledger 'running' only after dispatch returns an id", "dispatch": "builder@L2", "next": "execute.review" },
+        { "if": "builder reports BLOCKED on a plan defect (missing file ownership, wrong command)", "back_to": "plan.draft", "carry": "the defect as a planner L1 repair; other tickets keep running" },
+        { "if": "builder reports BLOCKED for another reason", "then": "resolve or take to the user; re-dispatch" },
+        { "if": "no tickets remain", "next": "execute.integrate" }
+      ]
+    },
+    "execute.review": {
+      "question": "What does the fresh reviewer say about this ticket's diff?",
+      "always": ["Builder success reports are never evidence.", "Record the review verdict per ticket into .orchestra/state.json and the ledger."],
+      "routes": [
+        { "if": "entry", "then": "fresh reviewer with ticket + diff + builder's claimed evidence + trailer", "dispatch": "reviewer@L2" },
+        { "if": "reviewer flags implausible evidence", "then": "gatekeeper re-proof: that ticket's done_when only, honest capture", "dispatch": "gatekeeper:tier-reproof@L1" },
+        { "if": "PASS", "then": "ledger complete with evidence", "next": "execute.ticket-loop" },
+        { "if": "FINDINGS rounds 1–3", "back_to": "execute.ticket-loop", "carry": "findings to the SAME builder (resume; a fresh builder with the findings history counts when resume is unavailable)" },
+        { "if": "FINDINGS round 4", "then": "escalation builder with the full findings history", "dispatch": "builder-max" },
+        { "if": "FINDINGS round 5", "then": "orchestrator adjudicates: fix decision inline, park in ledger as known issue, or ticket BLOCKED" },
+        { "if": "ESCALATE: contradicts plan/spec", "then": "to the USER verbatim with a recommendation — never into the loop" }
+      ]
+    },
+    "execute.integrate": {
+      "question": "Are the wave's ticket branches merged into the feature branch?",
+      "routes": [
+        { "if": "lone-builder wave (work already on the feature branch)", "next": "execute.wave-close" },
+        { "if": "all reviews PASS", "then": "orchestrator merges each ticket branch into the feature branch in the main tree, ordered by blocking edges; conflicts resolved in daylight — both intents preserved, never --abort, never invented behavior", "next": "execute.wave-close" },
+        { "if": "a conflict is too entangled", "then": "fresh builder as a findings round with both tickets pasted", "dispatch": "builder@L2" }
+      ]
+    },
+    "execute.wave-close": {
+      "always": ["Rewrite docs/orchestra/STATE.md (stamped)."],
+      "match": "all",
+      "routes": [
+        { "if": "worktrees exist or the batch spanned 2+ tickets", "then": "janitor: directory inspection (rescue-or-remove), memory draft from the pasted ledger excerpt, process-adherence checklist (every ticket has a review verdict in state.json; no unmerged ticket branches; redteam record present); orchestrator executes removals and commits the memory draft in this batch-closing commit", "dispatch": "janitor@L2" },
+        { "if": "single-ticket batch, no worktrees", "then": "orchestrator writes the memory line itself in the batch-closing commit" },
+        { "if": "first wave of the feature and the repo lands via PRs", "then": "open a DRAFT PR now — early, cheap, never a blocker; evidence-so-far in the body", "dispatch": "releaser@L1" },
+        { "if": "always (last step)", "next": "gates.fast" }
+      ]
+    },
+
+    "gates.fast": {
+      "question": "Does the fast set pass at the post-merge, post-memory HEAD?",
+      "always": ["The orchestrator derives or approves the file→spec mapping and pastes the exact command list — scoping is never the gatekeeper's guess.", "Record the gate report keyed by commit hash into .orchestra/state.json.", "Widening is mechanical, not judgment: a diff touching dependency manifests, build/tsconfig, migrations/schema, shared types/tokens, or auth widens the scoped set."],
+      "routes": [
+        { "if": "entry", "then": "fast set at HEAD: lint + typecheck + scoped unit + smoke core + framework doctor (per the repo's verified tooling list, e.g. React Doctor on React repos) + scoped e2e when a user-facing flow changed (isolated port)", "dispatch": "gatekeeper@L2" },
+        { "if": "FAIL", "back_to": "execute.ticket-loop", "carry": "the failing gate excerpt as findings to a lone builder in the main tree; re-run the set after — skip the wave-close always-batch on gate-repair re-entry" },
+        { "if": "FLAKY", "then": "quarantine ledger in state.json: first occurrence → ship allowed + flake ticketed; second occurrence of the same flake → mandatory fix ticket before that surface merges again; no per-flake user question after the first" },
+        { "if": "green and more waves remain", "next": "execute.setup" },
+        { "if": "green and the feature is complete", "next": "audit.decide" }
+      ]
+    },
+
+    "audit.decide": {
+      "question": "Does this change-set need the two-axis audit before release?",
+      "routes": [
+        { "if": "the batch closed with 2+ tickets, or the user asks", "next": "audit.run" },
+        { "if": "single-ticket run (the reviewer already saw the whole diff)", "next": "release.merge" }
+      ]
+    },
+    "audit.run": {
+      "question": "What do the two axes report?",
+      "always": ["Reports are presented verbatim, never merged — separation prevents one axis masking the other."],
+      "routes": [
+        { "if": "entry", "then": "auditor(standards) + auditor(spec) in parallel; small diffs pasted, large diffs passed as the pinned command + file list", "dispatch": "auditor:standards@L2 + auditor:spec@L2" },
+        { "if": "a finding contradicts the spec", "then": "to the USER verbatim" },
+        { "if": "findings on executed work", "back_to": "execute.ticket-loop", "carry": "verified findings as a findings round; re-audit the touched surface after" },
+        { "if": "standalone review request (entered from intake)", "then": "present both reports with per-axis worst-issue lines; END — no gates, no release, no push", "next": "terminal.done" },
+        { "if": "both CLEAN or user accepts residuals (chain run)", "next": "release.merge" }
+      ]
+    },
+
+    "release.merge": {
+      "question": "Can the branch merge such that the gated hash IS the shipped hash?",
+      "always": ["Read the repo's delivery declaration (AGENTS.md 'Delivery' line + .orchestra/delivery.json): landing rule, protected branches, deploy policy.", "The hook floor: pushes/merges to protected branches surface a Cursor 'ask' to the real user, and are denied while state.json's gate hash ≠ HEAD — the releaser's NEEDS-APPROVAL block is the audit trail above that floor."],
+      "routes": [
+        { "if": "gate green at HEAD and branch is rebased on current main (fast-forward possible)", "then": "flip the draft PR to ready with the final gate report; merge — fast-gate green is the merge requirement", "dispatch": "releaser@L2" },
+        { "if": "fast-forward impractical", "then": "merge, then auto re-run the fast set at the new main HEAD (mechanical, non-approval); only that green releases a deploy", "dispatch": "releaser@L2 + gatekeeper@L1" },
+        { "if": "HEAD moved past the gate record (mechanical check: `git diff --stat <gate-hash>..HEAD -- ':!docs' ':!*.md'` non-empty)", "back_to": "gates.fast", "carry": "stale-gate: re-run at current HEAD; docs/memory-only commits do NOT void a gate" },
+        { "if": "merge done and deploy policy is 'auto' for this repo/environment AND the diff contains no migrations/schema changes", "next": "release.deploy" },
+        { "if": "merge done, deploy gated (production default, or migrations present)", "then": "releaser stages the deploy and pauses: NEEDS-APPROVAL with exact command + blast radius; spec-axis audit must be green before a production deploy", "dispatch": "releaser@L2", "next": "release.deploy" }
+      ]
+    },
+    "release.deploy": {
+      "question": "Did the deploy verify?",
+      "routes": [
+        { "if": "gated and the user approves in chat", "then": "re-dispatch the releaser with the authorization block (USER APPROVED IN CHAT verbatim + EXECUTE EXACTLY); the hook's ask is the floor, the block is the record", "dispatch": "releaser@L2" },
+        { "if": "deploy executed", "then": "verify the health check and record evidence" },
+        { "if": "health check fails, or main breaks after merge", "next": "release.rollback" },
+        { "if": "verified, or user defers the deploy (record 'deferred:' in STATE.md — it survives the idle reset)", "next": "cleanup.final" }
+      ]
+    },
+    "release.rollback": {
+      "always": ["Revert first, diagnose second — restoring the last gated state is auto-executable because it restores a proven hash."],
+      "routes": [
+        { "if": "entry", "then": "releaser stages the revert of the merge commit; execute; verify the health check at the reverted state", "dispatch": "releaser@L2" },
+        { "if": "reverted and verified", "back_to": "bug.feedback-loop", "carry": "the failure evidence as the bug to diagnose" }
+      ]
+    },
+
+    "fullsuite.run": {
+      "question": "User-triggered full verification — never on the critical path.",
+      "always": ["Never blocks a PR, a merge, or a deploy. Runs whole-codebase, on main, in a quiet worktree or a Cursor cloud agent."],
+      "routes": [
+        { "if": "entry", "then": "full suite; results appended to docs/orchestra/STATE.md pointers and reported", "dispatch": "gatekeeper:full@L3" },
+        { "if": "failures found", "then": "each failure becomes an intake item (bug lane), prioritized with the user", "next": "terminal.done" },
+        { "if": "clean", "next": "terminal.done" }
+      ]
     },
 
     "bug.feedback-loop": {
-      "question": "Does a named, fast, red-capable command reproduce the bug?",
+      "question": "Does a named, already-run, red-capable, fast, deterministic command reproduce it?",
       "routes": [
-        { "if": "no loop exists yet", "then": "build one (failing test > curl script > CLI diff > headless browser > bisect harness — tightest that fits); completion bar: a NAMED command you have ALREADY RUN, red-capable, fast, and deterministic (or its reproduction rate stated and raised first); a perf bug gets a measured baseline before any fix; this IS the work; no loop possible → stop and ask the user" },
-        { "if": "loop exists", "then": "minimise reproduction; write 3–5 ranked falsifiable hypotheses (show the user, non-blocking); instrument one variable at a time; then treat the fix as a one-ticket execute.ticket-loop with the regression test as test-first" },
-        { "if": "fix verified", "then": "cleanup instrumentation; winning hypothesis in the commit message; audit.prepare if the diff is non-trivial, else terminal.done with evidence" }
+        { "if": "no loop yet", "then": "build one (failing test > curl > CLI diff > headless browser > bisect harness); non-deterministic → raise and state the reproduction rate first; perf → measured baseline before any change; no loop possible → stop and ask the user" },
+        { "if": "loop exists", "then": "minimise; 3–5 ranked falsifiable hypotheses shown to the user (non-blocking); instrument one variable at a time; fix = one ticket through the execute machinery with the regression test first", "next": "execute.setup" },
+        { "if": "fix verified and diff is trivial", "then": "clean instrumentation; winning hypothesis in the commit message", "next": "terminal.done" }
       ]
     },
 
+    "cleanup.final": {
+      "routes": [
+        { "if": "always", "then": "close any open batch (worktrees inspected/removed, memory committed); verify zero live worktrees, ledger CLOSED, STATE.md rewritten to idle (keeping any 'deferred:' line); expired RESEARCH.md removed", "next": "terminal.done" }
+      ]
+    },
     "terminal.done": {
       "states-allowed": ["DONE", "BLOCKED", "NOT-READY", "NEEDS-APPROVAL"],
       "routes": [
-        { "if": "declaring DONE", "then": "quote the evidence (commands + exit codes + hashes); confirm cleanup.final ran; only then say the job is finished" },
-        { "if": "anything is blocked/deferred", "then": "name it honestly; never dress BLOCKED as DONE" }
+        { "if": "declaring DONE", "then": "quote the evidence (commands + exit codes + hashes); cleanup.final ran; only then say the job is finished" },
+        { "if": "anything blocked/deferred", "then": "name it honestly; never dress one terminal state as another" }
       ]
     }
   },
+  "interrupts": {
+    "user changes a ruling mid-run": { "back_to": "design.gate", "carry": "the new ruling verbatim; the spec revision re-enters the user gate, then invalidates affected plan tickets: planner repair + re-red-team of the touched lenses before execution resumes" },
+    "user interrupt during execution": { "then": "stop dispatching; report ledger state; resume from the ledger — never re-dispatch blind (two builders on one ticket in one tree is corruption)" },
+    "a dispatch errors or never returns": { "then": "check the ledger and tree for partial commits, then dispatch fresh; liveness for background agents = state file + mtime at the verified sub-agent state path" }
+  },
   "invariants": [
-    "Sub-agents get self-contained briefs: rules, spec excerpts, and rulings pasted in; nothing else reaches their clean context.",
-    "Sub-agents must not spawn sub-agents. Cursor permits one further level since 2.5, so this is POLICY, not platform: every agent file forbids it and the subagentStart hook denies nested spawns. All fan-out is the orchestrator's.",
-    "User rulings are recorded verbatim, everywhere they are carried.",
-    "Evidence = command + exit code (captured without pipes) or screenshot; assertions are not evidence.",
-    "Worktrees exist only for 2+ concurrent editors; created and removed by the orchestrator within the wave.",
-    "Judgement roles (red-teamer, auditor, orchestrator) run the strongest tier via model: inherit; at install, pin builder/reviewer/gatekeeper/releaser frontmatter to the mid tier and scout/researcher/janitor to the fast tier for your plan's model lineup — builder-max stays inherit, which is what makes round-4 escalation a real tier jump.",
-    "Liveness (state file + mtime in ~/.cursor/subagents/) precedes every status claim about BACKGROUND sub-agents; foreground dispatches are synchronous, and a dispatch that errors or never returns means: check ledger and tree for partial commits, then dispatch fresh — never two builders on one ticket in one tree.",
-    "Approval boundaries: prepare-then-pause; only the user in chat authorizes, per action, per session.",
-    "Memory updates land in the batch-closing commit; stale entries are defects.",
-    "Honest terminal states; a first-round clean red-team pass on non-trivial work is a skeptic failure."
+    "Sub-agent briefs are self-contained: verbatim-critical excerpts (rulings, done_when, path rules) pasted; bulk material passed as pointers the agent reads itself.",
+    "Sub-agents never spawn sub-agents (policy; subagentStart hook denies it). All fan-out is the orchestrator's.",
+    "User rulings travel verbatim — full quote only when it fits one line, else pointer; never a trimmed quote.",
+    "Evidence = command + exit code (captured without pipes) or both-theme screenshots; assertions are not evidence.",
+    "Worktrees only for 2+ concurrent editors; created, integrated, and removed by the orchestrator within the wave.",
+    "Judgement roles (architect, planner, red-teamer, auditor, builder-max) run model: inherit — the ceiling; the rest are pinned lower at install (install.sh verifies).",
+    "Approval boundaries: prepare-then-pause; the hook's protected-branch 'ask' is the deterministic floor; files never authorize.",
+    "Memory lands in the batch-closing commit; stale entries are pruned, not superseded-in-place.",
+    "Honest terminal states — DONE, BLOCKED, NOT-READY, NEEDS-APPROVAL; never one dressed as another.",
+    "Every transition announced: `flow: <from> -> <to> (<matched if>)`."
   ]
 }

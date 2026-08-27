@@ -1,45 +1,27 @@
 ---
 name: execute
-description: Work a ticketed plan to completion — fresh builder per ticket, fresh reviewer per ticket, bounded findings loop, worktrees when 2+ builders run concurrently, ledger on disk. Use after a plan passes red team.
+description: Work the ticketed plan — fresh builder and fresh reviewer per ticket, bounded findings loop, worktrees for concurrent waves, orchestrator-owned integration, wave close in the fixed order. Routing: flow.json execute.* states.
 ---
 
 # Execute
 
-Goal: every ticket DONE with evidence, on a branch ready for audit and gates. You coordinate and talk to the user; builders build; reviewers review. You never build when a builder can.
+You coordinate and talk to the user; builders build; reviewers review. Briefs come from `briefs.md` — filled completely, since builders have clean context.
 
 ## Setup
 
-1. Create the feature branch. Create a **ledger** section in the plan file (or `docs/plans/<plan>-ledger.md`): per ticket — status, builder run, review verdict, evidence. State lives on disk, not in chat.
-2. **Worktree rule.** Count concurrent builders this wave:
-   - 1 builder → main tree. No worktree (cost without benefit).
-   - 2+ builders editing concurrently → **each gets its own worktree** (one shared tree = one shared git index; staging discipline cannot fix that): `git worktree add <repo>/.cursor/worktrees/<ticket> -b <ticket-branch>`. First check you are not already inside one (`git rev-parse --git-dir` differs from `--git-common-dir` means you are), and make sure `.cursor/worktrees/` is in the repo's `.gitignore`.
-   - Cursor's native per-agent worktrees also satisfy isolation, but Cursor may clean them up itself — if you use them, the named ticket branch is the only preservation you control; commits are the rescue, not the directory.
-   - **Prove the toolchain** in each fresh worktree before dispatching into it: install dependencies (worktrees share no `node_modules`), then run the actual test runner once (`ls node_modules/.bin/<runner>` then a no-op run) — install output lies. If the proof fails and one repair attempt does not fix it, collapse the wave to sequential builders in the main tree rather than dispatching into a broken tree.
-   - Each worktree serves its own ports; never share a dev server.
-   - You created it, you remove it — same wave it closes, via `/cleanup` inspection first. Never `git stash` anywhere in the repo while worktrees exist.
-3. Read the repo memory file; carry only what this wave needs.
+1. Feature branch + the ledger file `docs/plans/<feature>-ledger.md` (always separate) before the first dispatch. Read repo memory; carry only what the wave needs.
+2. **Worktrees for 2+ concurrent builders only** (one shared tree = one shared git index): `git worktree add <repo>/.cursor/worktrees/<ticket> -b <ticket-branch>`. First check you are not already inside one (`git rev-parse --git-dir` ≠ `--git-common-dir`), and keep `.cursor/worktrees/` gitignored. Install dependencies and **prove each toolchain** (run the real test runner once — install output lies) before dispatching; a proof that survives one repair attempt broken collapses the wave to sequential in the main tree. Own ports per tree. Cursor's native per-agent worktrees isolate too, but Cursor may clean them itself — commits on named ticket branches are the only preservation. Never `git stash` while worktrees exist.
 
-## Per ticket (continuous loop, no idle check-ins)
+## Per ticket
 
-1. **Dispatch a fresh builder** (`/build-wave` has the brief template). Paste the full ticket: files owned, test-first, done_when, scoped verification, tree assignment, branch, and the builder iron rules restated. Mark "running" in the ledger only after dispatch returns an id.
-2. **Per-ticket review gate.** When the builder reports, dispatch a **fresh reviewer** (`/review-gate` template) with the diff + the ticket. The builder's success report is never evidence.
-3. **Bounded findings loop:**
-   - Rounds 1–3: resume the **same builder** with the findings (Cursor: `Resume agent <id>`; if resume is unavailable, a fresh `builder` given the ticket plus the full findings history counts as the round).
-   - Round 4: dispatch **`builder-max`** — the escalation builder at the strongest tier — with ticket + full findings history.
-   - Round 5: adjudicate yourself, park the finding in the ledger as a known issue, or mark the ticket BLOCKED.
-   - A finding that contradicts the plan or spec goes to the **user**, not into the loop.
-4. Record completion + evidence in the ledger; dispatch the next unblocked ticket. Batch independent tickets into parallel waves.
+Dispatch → review → findings loop, per flow.json execute.review: rounds 1–3 same builder (resume, or fresh-with-history), round 4 `builder-max`, round 5 you adjudicate. Reviewer-flagged implausible evidence gets a gatekeeper re-proof (that done_when only). Ledger "running" only after a dispatch returns an id; verdicts recorded to the ledger and `.orchestra/state.json`. A builder BLOCKED on a plan defect routes to the planner as an L1 repair while other tickets keep running.
 
-## Wave close — in this order
+## Wave close — fixed order
 
-1. **Integrate.** All reviews PASS → merge each ticket branch into the feature branch yourself, in the main tree, ordered by blocking edges. Conflicts are expected — that is why the tickets were isolated. Resolve each by understanding both tickets' intent and preserving both; never `--abort`, never invent behavior. A conflict too entangled to resolve confidently goes to a fresh builder as a findings round, with both tickets pasted in the brief.
-2. **Close the batch.** `/cleanup`: janitor inspects worktree directories (brief must paste the ledger excerpt for this wave — the janitor has no other context); you rescue or remove, and commit the memory draft **in this batch-closing commit** on the feature branch.
-3. **Gate.** `/gates` tier 1 (fast, scoped) at the post-merge, post-memory HEAD — this is the hash that ships. Tier 2 (scoped e2e) too if the wave touched user-facing flows. Failures fix forward through the findings loop (a lone builder in the main tree now), then re-run the tier — any commit after a green gate voids it as evidence.
+1. **Integrate**: merge each reviewed ticket branch into the feature branch yourself, ordered by blocking edges. Conflicts are expected; resolve by preserving both tickets' intent — never `--abort`, never invented behavior; too-entangled conflicts go to a fresh builder with both tickets pasted.
+2. **Close the batch**: janitor (worktrees exist or 2+ tickets — brief pastes the ledger excerpt) or your own memory line (tiny batches); rescue-or-remove worktrees; memory draft lands **in this batch-closing commit**. Rewrite `STATE.md` (stamped). First wave of a PR-landing repo: releaser opens the **draft PR** now.
+3. **Gate**: the fast set at the post-merge, post-memory HEAD — the hash that ships. Failures fix forward (lone builder, main tree) and re-run without repeating step 1–2's always-batch.
 
 ## Interrupts and dead builders
 
-User interrupt: stop dispatching, report ledger state. Foreground dispatches are synchronous; the liveness rule (state file in `~/.cursor/subagents/` + mtime) applies to **background** sub-agents only. A dispatch that errors or never returns: check the ledger and the tree for partial commits first, then dispatch a fresh builder for that ticket — never two builders on one ticket in one tree.
-
-## Close
-
-All tickets DONE/parked with user sign-off → invoke `/audit`.
+User interrupt: stop dispatching, report ledger state, resume from the ledger — never re-dispatch blind. A dispatch that errors or never returns: check ledger and tree for partial commits, then dispatch fresh. Liveness applies to background agents (state file + mtime at the verified path); foreground dispatches are synchronous.

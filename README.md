@@ -1,69 +1,47 @@
 # Orchestra Roster for Cursor
 
-A complete multi-agent operating system for Cursor: ten named sub-agent roles, fourteen skills, a machine-readable if/then routing graph, deterministic guardrail hooks, and an orchestrator constitution — a translation of the charge chain (design → plan → execute → audit → gates → release → cleanup) into Cursor's native mechanisms.
+A multi-agent operating system for Cursor: twelve sub-agent roles, a machine-validated routing graph with three work lanes, deterministic guardrail hooks, bounded working memory, and a verified installer — the charge chain (design → plan → execute → audit → gates → release → cleanup) translated into Cursor's native mechanisms, then red-teamed twice: once for correctness, once against its own premises.
 
 ## What's in the box
 
 ```
 AGENTS.md                          Orchestrator constitution (main session; copy to project root)
+install.sh                         Verified install: hook self-tests, model-pinning check, graph validation
 .cursor/
-  agents/                          Ten sub-agent personas (clean-context system prompts)
-    scout.md  researcher.md  red-teamer.md  builder.md  builder-max.md
-    reviewer.md  auditor.md  gatekeeper.md  janitor.md  releaser.md
-  skills/                          Callable processes (/name in Cursor)
-    orchestrator/  SKILL.md + flow.json   ← the normative if/then routing graph
-    design/  plan/  execute/  diagnose/   ← the chain phases + the bug path
-    scout-recon/  research/  red-team/  build-wave/  review-gate/
-    audit/  gates/  cleanup/  release/    ← per-role briefing cards
-  rules/orchestra-router.mdc       alwaysApply rule — makes the router mandatory in every session
-  hooks.json + hooks/              block-dangerous.py (destructive shell commands)
-                                   block-nested-subagents.py (sub-agents spawning sub-agents)
-docs/flow.html                     Human-readable visualization of flow.json
+  agents/                          Twelve sub-agent personas (clean-context system prompts, level contracts)
+    scout researcher architect planner red-teamer builder builder-max
+    reviewer auditor gatekeeper janitor releaser
+  skills/
+    orchestrator/                  SKILL.md (mechanics) + flow.json (THE routing graph)
+                                   + briefs.md (every dispatch template) + STATE.template.md
+    design/ plan/ execute/ diagnose/ audit/ gates/ release/ cleanup/
+  rules/orchestra-router.mdc       alwaysApply: router mandate + sub-agent stop + resume-reconcile
+  hooks.json + hooks/              block-dangerous.py · block-nested-subagents.py
+docs/flow.html                     Human view of flow.json
+.orchestra/delivery.json           Per-repo delivery declaration (committed; rest of .orchestra/ is gitignored)
 ```
 
-## Why each layer exists (Cursor mechanics)
+## The design in five sentences
 
-- **`.cursor/agents/*.md`** — Cursor sub-agents. Frontmatter (`name`, `description`, `model`, `readonly`, `is_background`); the body is the sub-agent's entire system prompt. Sub-agents start with a **clean context**: no chat history, and rule/AGENTS.md inheritance is undocumented — so every rule a role must obey is written into its own file AND restated in the brief the orchestrator pastes at dispatch. Sub-agents cannot talk to the user — which is why the orchestrator is the main session, not an agent file. Since Cursor 2.5 a sub-agent CAN spawn one further level of children; this system forbids that by policy (every agent file + the subagentStart hook), because single-dispatcher and fresh-eyes guarantees depend on it.
-- **`.cursor/skills/*/SKILL.md`** — invoked automatically by description relevance or explicitly via `/name`. The chain skills carry the process; the role skills carry the exact brief template to paste at dispatch. Tip: pin the orchestrator skill as a Custom Mode to keep the router active every turn.
-- **`flow.json`** — the normative router. States, `if/then` routes, named dispatches, and global invariants. The orchestrator SKILL.md declares it law; the always-apply rule makes consulting it mandatory.
-- **`.cursor/rules/orchestra-router.mdc`** — `alwaysApply: true` injects the routing mandate into every main-session prompt; it is the guaranteed-presence mechanism, and it opens with a sub-agent stop clause so a dispatched role that does inherit rules never mis-routes into orchestration. Hooks enforce; rules instruct.
-- **`hooks.json`** — deterministic guardrails. `block-dangerous.py` tokenizes each shell command (handles `git -C`, reordered flags, env prefixes, `&&` chains) and denies force/delete pushes, hard resets, `clean -f`, force branch deletes, bulk discards, `stash` (repo-wide danger with worktrees), history rewrites (`rebase` except `--continue`/`--skip`, `commit --amend`), forced worktree removal, recursive force-deletes outside the tree, pipe-to-shell, and raw device writes. `block-nested-subagents.py` denies sub-agents spawning sub-agents. Deny-by-hook beats deny-by-prompt.
-- **`AGENTS.md`** — the constitution Cursor loads for the main session: roster table, role vocabulary (advisor/judge/reviewer/auditor/critic), the ten iron rules, model routing, memory homes. Capped at 120 lines.
+The **orchestrator is the main session** — the only entity that talks to the user or dispatches agents; sub-agents get clean contexts and self-contained briefs, and may not spawn agents (hook-enforced policy). **flow.json is the only statement of routing**: typed states with `if/then` routes, parallel `then` arrays, standing `always` duties, first-class backward edges (`back_to` + `carry`), three lanes (trivial / small / full chain), and announced transitions. **Load-bearing process is enforced, not trusted**: red-team verdicts, review verdicts, and gate hashes are recorded in `.orchestra/state.json`; the hook asks the real user on protected-branch pushes and denies them while the green-gate hash ≠ HEAD; the janitor's checklist detects skipped process from the file trail. **Memory is bounded and pointer-based**: `docs/orchestra/STATE.md` (stamped working memory, reconciled against the tree on resume — any session is killable without loss), per-plan ledgers, and pruned long-term memory in `docs/AGENT-MEMORY.md`. **Delivery is a per-repo declaration**: merge on fast-gate green with the gated hash as the shipped hash, draft PRs from the first wave (never blockers), deploy per environment policy, migrations never auto-deploy, revert-first rollback.
 
 ## Install into a project
 
 ```bash
-cp -R <this-repo>/.cursor <project>/ && cp <this-repo>/AGENTS.md <project>/AGENTS.md
-chmod +x <project>/.cursor/hooks/*.py
+cp -R <this-repo>/.cursor <this-repo>/AGENTS.md <this-repo>/install.sh <project>/ && cd <project> && bash install.sh
 ```
 
-Then two one-time steps:
+`install.sh` fails loudly until you: **pin the model tiers** (edit `model:` frontmatter — judgement roles architect/planner/red-teamer/auditor/builder-max stay `inherit`; pin builder/reviewer/gatekeeper/releaser to your plan's mid tier and scout/researcher/janitor to its fast tier). It also self-tests both hooks (a synthetic nested spawn must come back `deny`), validates every flow.json edge and dispatch role, writes the default `.orchestra/delivery.json` for you to edit, and prints the manual steps (verify the sub-agent state path; re-run after every Cursor update — hook payload schemas can change silently, and fail-opens land in `.orchestra/hook-failures.log`).
 
-1. **Pin the model tiers.** Edit the `model:` frontmatter in `.cursor/agents/`: leave `inherit` on red-teamer, auditor, and builder-max (the ceiling); set builder/reviewer/gatekeeper/releaser to your plan's mid-tier model id and scout/researcher/janitor to its fast tier. The round-4 escalation to builder-max is a real tier jump only after this step.
-2. **Check the guardrail actually fires:**
+Then edit the **Delivery** line in AGENTS.md and `.orchestra/delivery.json`: protected branches, landing rule, deploy policy per environment (`auto` only for low-blast environments — production defaults to approval).
 
-```bash
-echo '{"command":"git push --force"}' | <project>/.cursor/hooks/block-dangerous.py
-```
+## Honest limits (read this)
 
-Expected output contains `"permission": "deny"`. If it prints `allow`, the hook is broken — stop and fix before trusting it.
+- **The hooks are tripwires, not walls.** They tokenize commands (handling `git -C`, reordered flags, env prefixes, `&&` chains, and interpreter `-c` strings) and catch accidents and first-order drift; they do not stop adversarial evasion. The user-facing `ask` on protected branches is the actual floor for irreversibles.
+- **Prompt-enforced rules degrade under context pressure.** That is why the load-bearing ones are also file contracts (`state.json`) checked by the janitor and the hook — a silent skip becomes a visible gap.
+- **Full e2e never runs by itself.** It is user-triggered (or user-scheduled), whole-codebase, detached from PRs. A suite that only runs on demand rots — schedule a quiet run on main if you rely on it.
+- Cursor facts this package depends on (verified Aug 2026, re-verify after updates): agents in `.cursor/agents/` with clean contexts; one further nesting level allowed since 2.5 (we forbid it); skills auto-load by description; `.mdc` rules; snake_case hook responses; `subagentStart` / `beforeShellExecution` events.
 
-If the project already has an AGENTS.md, merge the roster section in rather than overwriting. User-level install (all projects): agents can also live in `~/.cursor/agents/`, skills in `~/.cursor/skills/` — but keep `flow.json`, rules, and hooks per-project so repos can diverge.
+## Working the system
 
-## Worktree policy (decided, with reasons)
-
-Worktrees are used **only when 2+ builders edit concurrently** — one shared tree means one shared git index, and no staging discipline fixes that. A lone builder works in the main tree: a worktree there costs a checkout, a dependency install, and a toolchain proof, and buys nothing. The orchestrator creates them, installs dependencies and proves the toolchain in each before dispatch, **merges the ticket branches into the feature branch at wave close** (conflicts resolved in daylight, both intents preserved), and removes the worktrees after the janitor's directory inspection (never trusting "branch merged"). Cursor's native per-agent worktrees also isolate, but Cursor may clean them itself — commits on named ticket branches are the only preservation that counts. `git stash` is banned repo-wide while worktrees exist — the hook enforces it.
-
-## Role vocabulary
-
-| Term | Meaning here |
-|---|---|
-| Advisor | Red-teamer consulted before a decision |
-| Judge | Red-teamer with a comparison brief, picks between finished alternatives |
-| Reviewer | Per-ticket diff-vs-ticket check during execution |
-| Auditor | Whole-change-set review (Standards axis + Spec axis) after execution |
-| Critic | Same as auditor — do not coin new role names |
-
-## Memory
-
-One `docs/AGENT-MEMORY.md` per project, owned by the orchestrator, updated and pruned in the batch-closing commit (janitor drafts, orchestrator commits). Sub-agents keep no memory — they are fresh by design; anything durable they learn travels through the janitor's draft.
+Say what you want; the router classifies into a lane and announces every transition. Trivial changes go straight through with evidence. Small changes (2–5 files) get design-in-chat + one builder + one reviewer + the fast gate. Full-chain work gets the interview, an architect-drafted spec you approve, a planner-drafted red-teamed plan, waves of builder+reviewer pairs, integration, audit when the change-set spans tickets, and release per your delivery declaration. Backward edges are first-class: findings loop to their author, a changed ruling re-enters the design gate and invalidates affected tickets, a failed deploy reverts first and enters the bug lane. Pin the orchestrator skill as a Custom Mode to keep the router active every turn.

@@ -28,6 +28,10 @@ Check the diff against the originating spec (pasted in your brief):
 - Do not fix anything; do not rank against the other axis (you cannot see it — that separation prevents one axis masking the other).
 - End with a one-line "worst issue on this axis" summary. Verdict: **CLEAN** or findings ranked most-severe first. Under 400 words.
 
-## Non-negotiable
+Non-negotiable: never spawn sub-agents (enforced by hook; all fan-out belongs to the orchestrator). Finish your brief and report back.
 
-Never spawn sub-agents of your own. Cursor allows one further level of nesting, but this system forbids it: all fan-out belongs to the orchestrator, or fresh-eyes and single-dispatcher guarantees break. Finish your brief and report back; the orchestrator dispatches any further work.
+## Levels (the brief names one; default L2)
+
+- **L1**: one axis over a small diff (<200 lines); top findings only, under 200 words.
+- **L2 standard**: full axis review per the format below.
+- **L3**: full axis review of a multi-wave change-set, per-wave breakdown.

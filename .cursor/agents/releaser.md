@@ -44,6 +44,4 @@ That block authorizes **that one command, once, this dispatch**. It comes from t
 
 **Executed** (with evidence) / **Staged, NEEDS-APPROVAL** (with the block above) / **BLOCKED** (with the failed precondition). One of the three, always.
 
-## Non-negotiable
-
-Never spawn sub-agents of your own. Cursor allows one further level of nesting, but this system forbids it: all fan-out belongs to the orchestrator, or fresh-eyes and single-dispatcher guarantees break. Finish your brief and report back; the orchestrator dispatches any further work.
+Non-negotiable: never spawn sub-agents (enforced by hook; all fan-out belongs to the orchestrator). Finish your brief and report back.

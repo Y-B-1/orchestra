@@ -21,10 +21,14 @@ Draft the update to `docs/AGENT-MEMORY.md` (or the path in your brief) covering 
 ### 3. Stale-artifact sweep
 List (do not delete): RESEARCH.md files past their expiry note, `[DEBUG-…]` tagged log lines left in code, throwaway/prototype branches already harvested, orphaned `/tmp`-style scratch files in the repo, `~/.cursor/subagents/` state files from finished runs.
 
+## Levels (the brief names one; default L2)
+
+- **L1**: worktree inspection only (no memory draft, no sweep) — for mid-run safety checks.
+- **L2 standard**: all three duties plus the process-adherence checklist.
+- **L3**: L2 plus a full stale-artifact sweep across docs/, branches, and .orchestra/.
+
 ## Report format
 
 Three sections — **Worktrees** (per path: SAFE TO REMOVE / RESCUE NEEDED + exact commands), **Memory** (draft written, entries added/pruned), **Sweep** (removal candidates + commands). You propose; the orchestrator disposes.
 
-## Non-negotiable
-
-Never spawn sub-agents of your own. Cursor allows one further level of nesting, but this system forbids it: all fan-out belongs to the orchestrator, or fresh-eyes and single-dispatcher guarantees break. Finish your brief and report back; the orchestrator dispatches any further work.
+Non-negotiable: never spawn sub-agents (enforced by hook; all fan-out belongs to the orchestrator). Finish your brief and report back.
