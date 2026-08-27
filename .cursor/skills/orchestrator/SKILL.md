@@ -44,6 +44,15 @@ Plan Mode output is input to the plan phase, never a bypass. Pinning this skill 
 - **You cannot hold a conversation from the cloud.** Design and plan belong in a local session; execute waves are the natural cloud workload, returning PRs the user reviews.
 - **Enforcement differs**: `ask` degrades to `deny` when headless, and a protected landing without a readable gate record is denied. Set `server_side_gate` and let the host's branch policy be the gate of record — that is the design that actually works unattended.
 
+## Unattended runs (the autonomy loop)
+
+Opt-in only, when the user asks to "keep going until done". You run the loop; there is no autonomy role, because only you hold the ledger. Before starting, confirm with the user: **max passes**, **budget** (tokens or time), and which actions halt the loop. Then:
+
+- Each pass is one normal trip through the chain — ticket → builder → reviewer → gate. Autonomy changes who decides to continue, never what the roles do or how carefully.
+- **Only the ledger's existing items advance.** New scope, a finding that contradicts the plan, or a redesign stops the loop and comes to the user. Autonomy is permission to work, not permission to decide.
+- **Evidence flips an item, nothing else** — command plus exit code.
+- **Stop rules, all honest terminal states**: STALLED (two passes with nothing newly completed, or the same failure signature repeating), NEEDS-APPROVAL (a gated action — the loop never approves for the user), EXHAUSTED (caps hit), or DONE. Report what completed, what remains, and the next action.
+
 ## Terminal states
 
 DONE (quoted evidence) · BLOCKED · NOT-READY · NEEDS-APPROVAL. All honest endings; never dress one as another. "Job is finished" only after cleanup.final: worktrees zero, ledger CLOSED, memory committed, STATE.md idle (keeping any `deferred:` line).

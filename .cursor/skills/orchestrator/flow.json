@@ -46,6 +46,11 @@
           "next": "fullsuite.run"
         },
         {
+          "if": "the user asks for an unattended/continuous run ('keep going until done', 'run this overnight')",
+          "then": "confirm the caps and the stop rules with the user, then enter the autonomy loop",
+          "next": "autonomy.loop"
+        },
+        {
           "if": "non-trivial feature/change: multi-wave, multi-subsystem, a migration, or hard to reverse",
           "next": "design.recon"
         },
@@ -269,6 +274,9 @@
           "then": "orchestrator drafts inline and says so; self-review for placeholders, contradictions, dual-readable lines, scope creep",
           "next": "design.gate"
         }
+      ],
+      "always": [
+        "Terms ruled on this phase are written to CONTEXT.md (glossary only). Seams the tests will assert at are named in the spec — the plan inherits them."
       ]
     },
     "design.gate": {
@@ -736,6 +744,45 @@
         {
           "if": "anything blocked/deferred",
           "then": "name it honestly; never dress one terminal state as another"
+        }
+      ]
+    },
+    "autonomy.loop": {
+      "question": "Unattended mode: is there an unfinished ledger item and budget left?",
+      "always": [
+        "Never invent work: the loop only advances items already in the plan's ledger. New scope stops the loop and goes to the user.",
+        "Each pass is a fresh dispatch through the normal chain (execute.ticket-loop → execute.review → gates.fast); autonomy changes WHO decides to continue, never WHAT the roles do.",
+        "A ledger item flips to done only on evidence (command + exit code). Flipping without evidence is the one tamper rule."
+      ],
+      "routes": [
+        {
+          "if": "entry",
+          "then": "record the caps the user set: max passes, max consecutive no-progress passes (default 2), token/time budget, and the approval boundaries that halt the loop"
+        },
+        {
+          "if": "an unblocked ledger item remains and caps are not hit",
+          "then": "run one pass through the normal chain, record the result, loop",
+          "loop": "autonomy.loop"
+        },
+        {
+          "if": "two consecutive passes produce no new completed item, or the same failure signature repeats",
+          "then": "STALLED — stop and report; a loop that is not converging burns budget without learning"
+        },
+        {
+          "if": "a pass needs a gated action (deploy, external send, schema change)",
+          "then": "NEEDS-APPROVAL — halt the loop and surface it; the loop never approves on the user's behalf"
+        },
+        {
+          "if": "a finding contradicts the plan or spec, or new scope appears",
+          "then": "stop and take it to the user — autonomy is permission to work, not permission to redesign"
+        },
+        {
+          "if": "caps hit",
+          "then": "EXHAUSTED — report what completed, what remains, and the next action"
+        },
+        {
+          "if": "every ledger item is done",
+          "next": "audit.decide"
         }
       ]
     }
