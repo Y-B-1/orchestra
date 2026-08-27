@@ -42,7 +42,21 @@ Then edit the **Delivery** line in AGENTS.md and `.orchestra/delivery.json`: `in
 - **The hooks are tripwires, not walls.** They tokenize commands (handling `git -C`, reordered flags, env prefixes, `&&` chains, and interpreter `-c` strings) and gate protected-branch landings across `git`, `gh`, `az repos`, and `glab` plus declared deploy commands — catching accidents and first-order drift, not adversarial evasion. The user-facing `ask` is the actual floor for irreversibles; a host-side branch policy is stronger still, which is why `server_side_gate` exists.
 - **Prompt-enforced rules degrade under context pressure.** That is why the load-bearing ones are also file contracts (`state.json`) checked by the janitor and the hook — a silent skip becomes a visible gap.
 - **Full e2e never runs by itself.** It is user-triggered (or user-scheduled), whole-codebase, detached from PRs. A suite that only runs on demand rots — schedule a quiet run on main if you rely on it.
+- **In cloud agents, approvals change shape.** Cursor cloud agents auto-run terminal commands and the docs do not define what `ask` means there, so the hook degrades `ask` to `deny` when headless, and denies protected landings with no readable gate record (`.orchestra/state.json` is gitignored and does not survive a fresh clone). Set `server_side_gate: true` and let the host's branch policy be the gate — host-mediated PR completion stays allowed, direct pushes to protected branches never do. Hooks also do not run during a cloud agent's early read-only turns.
 - Cursor facts this package depends on (verified Aug 2026, re-verify after updates): agents in `.cursor/agents/` with clean contexts; one further nesting level allowed since 2.5 (we forbid it); skills auto-load by description; `.mdc` rules; snake_case hook responses; `subagentStart` / `beforeShellExecution` events.
+
+## Local, cloud, or both
+
+The chain is the same; only isolation and conversation change.
+
+| | Local session | One cloud agent = orchestrator | One cloud agent per feature |
+|---|---|---|---|
+| Sub-agents | in-session, shared tree | in-VM, shared clone | each VM runs its own mini-chain |
+| Worktrees | 2+ concurrent builders | **same rule** — shared clone | none; the VM is the isolation |
+| Handoffs | briefs + disk | briefs + disk | git branches + relayed reports |
+| Talks to you | yes | async (Slack, web, PR) | via PRs |
+
+Design and plan are conversations — keep them local. Execute waves are the natural cloud workload. Split *work* across VMs, never *roles*.
 
 ## Working the system
 

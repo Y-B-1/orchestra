@@ -28,6 +28,8 @@ out=$(echo '{"command":"glab mr merge 42"}' | ./.cursor/hooks/block-dangerous.py
 echo "$out" | grep -Eq '"(ask|deny)"' || bad "glab mr merge not gated: $out"
 out=$(echo '{"command":"az repos pr show --id 42"}' | ./.cursor/hooks/block-dangerous.py)
 echo "$out" | grep -q '"allow"' || bad "read-only az repos command wrongly gated: $out"
+out=$(echo '{"command":"git push origin main"}' | CURSOR_CLOUD_AGENT=1 ./.cursor/hooks/block-dangerous.py)
+echo "$out" | grep -q '"deny"' || bad "headless protected push not denied (ask must degrade to deny in cloud): $out"
 
 say "== 3. Nested-subagent self-test (synthetic payload)"
 rm -f .orchestra/subagent-children.json
@@ -94,6 +96,8 @@ fi
 
 say "== 8. Manual steps (cannot be verified here)"
 say "  - Start one background sub-agent in Cursor and note where its state file lands; record that path in .orchestra/state.json as subagent_state_path."
+say "  - If you run cloud agents: confirm headless detection. The hook treats CURSOR_CLOUD_AGENT / CURSOR_BACKGROUND_AGENT / CURSOR_AGENT_ID / CI as headless (ask -> deny). If cloud runs set none of these, add \"headless\": true to .orchestra/delivery.json for that repo, or the approval floor silently weakens there."
+say "  - Cloud landing needs server_side_gate: a host branch policy running the fast set. Without it, cloud agents cannot land on a protected branch at all (by design)."
 say "  - Re-run this script after every Cursor update (hook payload schemas can change silently — check .orchestra/hook-failures.log)."
 
 [ "$FAIL" -eq 0 ] && say "INSTALL OK" || say "INSTALL INCOMPLETE — fix the FAIL lines above"

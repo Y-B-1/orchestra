@@ -25,8 +25,13 @@ Write findings to <path>/RESEARCH.md, per-claim citations, header
 ## architect
 
 ```
-Mode: <Sketch|Spec> at <level>. Materials: recon report <path/paste>, rulings below
-VERBATIM, [Sketch: "radically different from: <premise>"] [Spec: winning approach].
+Mode: <Brainstorm|Sketch|Spec> at <level>. Materials: recon report <path/paste>, rulings
+below VERBATIM, [Brainstorm: the problem in 2–3 lines + hard constraints only]
+[Sketch: "radically different from: <premise>"] [Spec: winning approach].
+Brainstorm: 6–10 genuinely distinct options, 2–3 lines each; include one that reuses what
+the codebase already has, one that costs far less code, one that removes a requirement
+instead of building, one deliberately bold. Do NOT filter or rank while generating; add a
+short "worth a closer look" note at the end. Do not pick a winner.
 --- RULINGS (byte-for-byte; reproduce unchanged) --- ...
 Open decisions in these inputs become "Open questions" — never a silent choice.
 ```

@@ -99,10 +99,11 @@
 <h2>Design</h2>
 <div class="phase">
 <div class="state"><h3>design.recon &rarr; design.frontier &rarr; design.approaches</h3>
-<div class="always">No product code in any design state. Every ruling recorded verbatim at the moment it is made.</div>
+<div class="always">No product code in any design state. Every ruling recorded verbatim at the moment it is made. Diverge before converging &mdash; never present one option as if it were the only one.</div>
 <table>
 <tr><td class="if">codebase can answer</td><td class="then">scouts in parallel; never ask the user those <span class="role r-scout">scout@L2</span></td></tr>
 <tr><td class="if">unsettled decisions</td><td class="then">frontier rounds: all ready questions at once, numbered, each with a recommendation</td></tr>
+<tr><td class="if">the space isn't open yet (new feature, unfamiliar problem, or one idea on the table)</td><td class="then"><b>brainstorm</b>: 6&ndash;10 genuinely distinct options, unfiltered &mdash; one reusing what exists, one costing far less code, one removing a requirement, one deliberately bold; present before narrowing <span class="role r-author">architect:brainstorm@L2</span></td></tr>
 <tr><td class="if">hard-to-reverse interface</td><td class="then">design-it-twice: parallel sketches + judge <span class="role r-author">architect:sketch</span> <span class="role r-red">red-teamer:judge</span></td></tr>
 <tr><td class="if">only running code can answer</td><td class="then">throwaway prototype on a disposable branch; harvest; record the ruling</td></tr>
 <tr><td class="if">post-cutoff API / standard</td><td class="then">queue background research for the plan phase <span class="role r-researcher">researcher</span></td></tr>
@@ -145,7 +146,8 @@
 <div class="always">Separate ledger file before the first dispatch. Never git stash while worktrees exist.</div>
 <table>
 <tr><td class="if">1 builder</td><td class="then">main tree, no worktree</td></tr>
-<tr><td class="if">2+ builders</td><td class="then">one worktree per builder; deps installed + toolchain PROVEN before dispatch; own ports</td></tr>
+<tr><td class="if">2+ builders sharing one checkout (local, or sub-agents inside one cloud VM)</td><td class="then">one worktree per builder; deps installed + toolchain PROVEN before dispatch; own ports</td></tr>
+<tr><td class="if">each builder is its own cloud agent (own VM + clone)</td><td class="then">no worktrees &mdash; the VM is the isolation; each pushes its branch, integration fetches them; only committed things travel</td></tr>
 <tr><td class="if">toolchain proof fails twice</td><td class="then">collapse the wave to sequential in the main tree</td></tr>
 <tr><td class="if">unblocked tickets</td><td class="then">fresh builder each, parallel, complete self-contained briefs <span class="role r-builder">builder@L2 &times;N</span></td></tr>
 <tr><td class="if">builder BLOCKED on a plan defect</td><td class="then back">plan.draft, as a planner L1 repair; other tickets keep running</td></tr>
@@ -229,6 +231,17 @@
 <tr><td class="if">you change a ruling mid-run</td><td class="then back">design.gate with the new ruling verbatim; the revised spec then invalidates affected tickets: planner repair + re-red-team of touched lenses before execution resumes</td></tr>
 <tr><td class="if">you interrupt execution</td><td class="then">stop dispatching; report ledger state; resume from the ledger, never re-dispatch blind</td></tr>
 <tr><td class="if">a dispatch dies</td><td class="then">check ledger + tree for partial commits, then dispatch fresh</td></tr>
+</table></div>
+</div>
+
+<h2>Running in the cloud</h2>
+<div class="phase">
+<div class="state"><h3>topology</h3><table>
+<tr><td class="if">default</td><td class="then">one cloud agent IS the orchestrator; sub-agents run inside its VM sharing one clone &mdash; the whole chain applies unchanged, worktrees included</td></tr>
+<tr><td class="if">parallel independent work</td><td class="then">one cloud agent per feature/ticket, each running its own mini-chain and returning a PR. Split <b>work</b> across VMs, never <b>roles</b> &mdash; role handoffs would become git round-trips</td></tr>
+<tr><td class="if">always</td><td class="then">only committed things travel: a VM is a fresh clone, so gitignored files (including .orchestra/state.json) are absent</td></tr>
+<tr><td class="if">conversation needed</td><td class="then">a cloud orchestrator reaches you asynchronously &mdash; run design and plan locally, send execute waves to the cloud</td></tr>
+<tr><td class="if">enforcement</td><td class="then"><code>ask</code> degrades to <b>deny</b> when headless; a protected landing with no readable gate record is denied; set <code>server_side_gate</code> so the host's branch policy is the gate &mdash; host-mediated PR completion stays allowed, direct pushes to protected branches never do</td></tr>
 </table></div>
 </div>
 

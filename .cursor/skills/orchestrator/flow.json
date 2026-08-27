@@ -216,9 +216,14 @@
       ]
     },
     "design.approaches": {
-      "question": "Is the solution space explored?",
+      "question": "Has the space been opened (divergence) before it is narrowed (convergence)?",
       "match": "all",
       "routes": [
+        {
+          "if": "the solution space is not yet opened — a new feature, an unfamiliar problem, or the user has only one idea on the table",
+          "then": "architect brainstorm: 6–10 genuinely distinct options, unfiltered, including a reuse-what-exists option, a far-less-code option, a remove-the-requirement option, and one deliberately bold one; present the list to the user before narrowing",
+          "dispatch": "architect:brainstorm@L2"
+        },
         {
           "if": "standard shape",
           "then": "present 2–3 approaches with trade-offs and ONE recommendation",
@@ -245,6 +250,9 @@
           "if": "approach settled (winner chosen, prototype harvested, or approaches presented)",
           "next": "design.spec"
         }
+      ],
+      "always": [
+        "Diverge before converging: never present one option as though it were the only one. Judging during divergence kills the interesting option."
       ]
     },
     "design.spec": {
@@ -356,20 +364,25 @@
       ]
     },
     "execute.setup": {
-      "question": "How many builders will edit concurrently this wave?",
+      "question": "How many builders edit concurrently, and do they share a filesystem?",
       "always": [
         "Ledger file (docs/plans/<feature>-ledger.md) exists before the first dispatch.",
         "Never git stash while worktrees exist."
       ],
       "routes": [
         {
-          "if": "1",
+          "if": "1 builder",
           "then": "main tree, no worktree",
           "next": "execute.ticket-loop"
         },
         {
-          "if": "2+",
+          "if": "2+ builders sharing one checkout (local session, or sub-agents inside ONE cloud VM)",
           "then": "one worktree per builder (git worktree add <repo>/.cursor/worktrees/<ticket> -b <ticket-branch>; check you are not already inside one; .cursor/worktrees/ gitignored); install dependencies and PROVE each toolchain before dispatch; own ports per tree",
+          "next": "execute.ticket-loop"
+        },
+        {
+          "if": "each builder is its own cloud agent (separate VM and clone)",
+          "then": "no worktrees — the VM is the isolation; each pushes its own branch, and integration happens by fetching those branches; anything the next role needs must be COMMITTED, since gitignored files do not travel",
           "next": "execute.ticket-loop"
         },
         {
@@ -451,6 +464,10 @@
         {
           "if": "lone-builder wave (work already on the feature branch)",
           "next": "execute.wave-close"
+        },
+        {
+          "if": "builders ran as separate cloud agents",
+          "then": "fetch their pushed branches and merge each into the feature branch, ordered by blocking edges — same conflict discipline, remote source"
         },
         {
           "if": "all reviews PASS",
@@ -747,5 +764,13 @@
     "Memory lands in the batch-closing commit; stale entries are pruned, not superseded-in-place.",
     "Honest terminal states — DONE, BLOCKED, NOT-READY, NEEDS-APPROVAL; never one dressed as another.",
     "Every transition announced: `flow: <from> -> <to> (<matched if>)`."
-  ]
+  ],
+  "cloud": {
+    "topology": "DEFAULT (A): one cloud agent IS the orchestrator; its sub-agents are children inside that same VM, sharing one clone. Everything in this graph applies unchanged. ALTERNATIVE (B): one cloud agent per independent FEATURE or ticket, each running its own mini-chain and returning a PR. Never split ROLES across VMs — roles are coupled by handoffs, and every boundary would become a git round-trip.",
+    "worktrees": "Topology A: sub-agents share the VM's single clone and single git index, so the local rule applies unchanged — 2+ concurrent builders get worktrees inside the VM. Topology B: each VM is already an isolated clone; no worktrees.",
+    "handoff": "Topology A: briefs + shared disk, as local. Topology B: nothing but git (pushed branches) and the orchestrator relaying report text — anything load-bearing must be committed, because gitignored files do not exist in a fresh clone.",
+    "conversation": "A cloud orchestrator cannot hold a live conversation; it reaches the user asynchronously (Slack, web, PR comments). Design and plan are conversations — run them locally. Execute waves are the natural cloud workload.",
+    "enforcement": "In cloud, `ask` is undefined behavior (cloud agents auto-run commands), so the hook degrades ask -> DENY when headless. .orchestra/state.json is gitignored and therefore absent from a fresh clone: a protected landing with no readable gate record is DENIED in cloud. The correct cloud answer is server_side_gate — let the host's branch policy be the gate of record. Hooks also do not run during a cloud agent's early read-only turns.",
+    "config": "Repo-level config travels with the clone (.cursor/agents, .cursor/skills, .cursor/hooks.json, AGENTS.md). User-level config (~/.cursor/*) does NOT. Keep this package project-scoped."
+  }
 }

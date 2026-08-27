@@ -29,7 +29,27 @@ def log_failure(note):
         pass
 
 
+def headless():
+    """True when no human can answer a permission prompt (cloud agent / CI).
+
+    Cursor's docs do not define `ask` semantics for cloud agents, and cloud agents
+    auto-run terminal commands — so an `ask` there may simply pass. When we cannot
+    confirm a human is present, `ask` degrades to `deny`. Override explicitly with
+    "headless": true|false in .orchestra/delivery.json.
+    """
+    declared = delivery().get("headless", "auto")
+    if declared is not True and declared is not False:
+        markers = ("CURSOR_CLOUD_AGENT", "CURSOR_BACKGROUND_AGENT", "CURSOR_AGENT_ID",
+                   "CI", "BUILD_BUILDID", "GITHUB_ACTIONS", "TF_BUILD")
+        return any(os.environ.get(m) for m in markers)
+    return declared
+
+
 def respond(permission, reason=None):
+    if permission == "ask" and headless():
+        permission = "deny"
+        reason = (f"{reason} — no human can answer a prompt here (cloud/CI). "
+                  "Let the host's branch policy land it, or run this from a session with a person in it")
     out = {"permission": permission}
     if reason:
         out["user_message"] = f"Orchestra guardrail [{permission}]: {reason}"
@@ -78,11 +98,17 @@ def gate_fresh():
     if delivery().get("server_side_gate"):
         return None
     try:
-        with open(".orchestra/state.json") as f:
-            state = json.load(f)
+        try:
+            with open(".orchestra/state.json") as f:
+                state = json.load(f)
+        except FileNotFoundError:
+            return False if headless() else None
         gate = (state.get("gates") or {}).get("last_green_hash", "")
         if not gate:
-            return None
+            # No record. Locally that means "no opinion"; in a cloud VM it means the
+            # record could not travel (state.json is gitignored), so fail CLOSED —
+            # a headless landing with no provable gate is exactly what we must stop.
+            return False if headless() else None
         head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
                               text=True, timeout=5).stdout.strip()
         return head.startswith(gate) or gate.startswith(head)
@@ -144,10 +170,18 @@ def check_tokens(tokens):
                 and re.search(r"status\s+completed|--auto-complete\s+true|--complete\s+true", joined))
         )
         if lands:
+            # Host-mediated landing: when the host enforces the gate itself (branch
+            # policy / required checks), it will refuse a PR whose checks are red.
+            # That is a stronger gate than ours, and it is the recommended cloud path,
+            # so it stays allowed even headless. Direct pushes below do NOT get this.
+            if delivery().get("server_side_gate"):
+                if headless():
+                    respond("allow")
+                respond("ask", f"landing a PR/MR via {prog} (the host's branch policy is the gate)")
             if gate_fresh() is False:
                 respond("deny", "PR/MR completion while the recorded green-gate hash differs from "
-                                "HEAD — re-run the fast gate first (or let the host's branch policy "
-                                "gate the merge and record its result)")
+                                "HEAD — re-run the fast gate first, or enable server_side_gate and "
+                                "let the host's branch policy be the gate of record")
             respond("ask", f"landing a PR/MR on a protected branch via {prog}")
         return
 

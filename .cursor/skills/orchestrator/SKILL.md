@@ -35,6 +35,15 @@ At session start with an OPEN run in STATE.md: reconcile before acting — stamp
 
 Plan Mode output is input to the plan phase, never a bypass. Pinning this skill as a Custom Mode keeps the router active every turn — recommend it once. Liveness for background agents: state file + mtime at the sub-agent state path verified during install.
 
+## Running in the cloud
+
+`flow.json`'s `cloud` block is the contract; the essentials:
+
+- **You are one cloud agent, and your sub-agents live inside your VM** — sharing one clone, so worktrees apply to concurrent builders exactly as they do locally. The other shape (one cloud agent per independent feature or ticket, each returning a PR) is for parallel *work*, never for splitting *roles*: role handoffs across VMs degrade to git round-trips.
+- **Only committed things travel.** A VM is a fresh clone — gitignored files, including `.orchestra/state.json`, are absent. Put what the next role needs in the brief or in git.
+- **You cannot hold a conversation from the cloud.** Design and plan belong in a local session; execute waves are the natural cloud workload, returning PRs the user reviews.
+- **Enforcement differs**: `ask` degrades to `deny` when headless, and a protected landing without a readable gate record is denied. Set `server_side_gate` and let the host's branch policy be the gate of record — that is the design that actually works unattended.
+
 ## Terminal states
 
 DONE (quoted evidence) · BLOCKED · NOT-READY · NEEDS-APPROVAL. All honest endings; never dress one as another. "Job is finished" only after cleanup.final: worktrees zero, ledger CLOSED, memory committed, STATE.md idle (keeping any `deferred:` line).
