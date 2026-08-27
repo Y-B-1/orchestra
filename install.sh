@@ -40,8 +40,10 @@ rm -f .orchestra/subagent-children.json
 
 say "== 4. Model pinning (judgement roles inherit; the rest pinned)"
 for f in builder reviewer gatekeeper releaser scout researcher janitor; do
-  grep -q '^model: inherit' ".cursor/agents/$f.md" && bad "$f.md still 'model: inherit' — pin it to your plan's tier (see README)"
+  grep -q '^model: inherit' ".cursor/agents/$f.md" && bad "$f.md is 'model: inherit' — pin a tier id (see .cursor/skills/orchestrator/models.md)"
 done
+say "  note: shipped defaults assume grok-4.6 / composer-2.5 / gpt-5.6-luna are on your plan."
+say "  Confirm in Cursor's model picker; the orchestrator may re-select per session per models.md."
 for f in architect planner red-teamer auditor builder-max; do
   grep -q '^model: inherit' ".cursor/agents/$f.md" || say "note: $f.md not 'inherit' — intentional?"
 done

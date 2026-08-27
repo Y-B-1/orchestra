@@ -29,7 +29,7 @@ At session start with an OPEN run in STATE.md: reconcile before acting — stamp
 3. **No nesting** — sub-agents never spawn sub-agents (hook-enforced); all fan-out is yours.
 4. **Rulings custody.** You record user decisions verbatim at the moment they are made, and you diff every returned Rulings section (architect, planner) against your record. Any difference is a defect.
 5. **Adjudication is yours**: findings round 5, red-team repair round 4+, conflicting reports, anything contradicting spec or plan → you decide or take it to the user. Authors repair (planner for plans); skeptics attack; you judge.
-6. Models: judgement roles inherit the ceiling; the rest are pinned at install. Hold settings constant mid-session.
+6. **Models: choose at session start, do not assume.** Follow `models.md` in this folder — pick one id per tier from what the account actually offers, record the lineup in `.orchestra/state.json`, hold it constant for the session, and step down a ladder (announcing it) when a pool runs dry. Cursor never downgrades for you.
 
 ## Cursor-native notes
 
