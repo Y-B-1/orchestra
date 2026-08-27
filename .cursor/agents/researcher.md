@@ -28,3 +28,7 @@ Write `RESEARCH.md` at the repo location the brief names (default: repo root, or
 ```
 
 Header must carry the expiry note — stale research misleads agents and must be deleted when the sprint ends. Return a short summary of the findings plus the file path as your final message.
+
+## Non-negotiable
+
+Never spawn sub-agents of your own. Cursor allows one further level of nesting, but this system forbids it: all fan-out belongs to the orchestrator, or fresh-eyes and single-dispatcher guarantees break. Finish your brief and report back; the orchestrator dispatches any further work.

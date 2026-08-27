@@ -9,10 +9,11 @@ Match the tier to the blast radius. Never escalate a tier out of anxiety; never 
 
 | Tier | When | Contents |
 |---|---|---|
+| 0 Re-proof | a reviewer flags implausible builder evidence | that one ticket's done_when command, nothing else |
 | 1 Fast | every wave close | lint + typecheck + unit tests scoped to changed surface |
-| 2 Scoped e2e | per work unit with a user-facing flow | the e2e specs covering changed flows, isolated port |
+| 2 Scoped e2e | per wave with a user-facing flow | the e2e specs covering changed flows, isolated port |
 | 3 Derived pre-merge | before release prep | changed-surface specs + smoke core, derived from the actual diff |
-| 4 Full suite | ONLY on the user's explicit order | everything; run in a quiet worktree or as a background run, never on the critical path |
+| 4 Full suite | ONLY on the user's explicit order | everything; run in a quiet worktree, a background run, or a Cursor cloud agent — never on the critical path |
 
 ## Brief template
 

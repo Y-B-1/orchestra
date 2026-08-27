@@ -25,3 +25,7 @@ Return a single structured report:
 - **Risks/unknowns** — anything adjacent that looks load-bearing or fragile, and what you could not determine.
 
 Keep it under 500 words unless the brief asks for more. Your report is your only output — the parent has no access to your intermediate steps.
+
+## Non-negotiable
+
+Never spawn sub-agents of your own. Cursor allows one further level of nesting, but this system forbids it: all fan-out belongs to the orchestrator, or fresh-eyes and single-dispatcher guarantees break. Finish your brief and report back; the orchestrator dispatches any further work.

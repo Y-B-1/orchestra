@@ -9,6 +9,7 @@
     "researcher": ".cursor/agents/researcher.md — primary-source research, background",
     "red-teamer": ".cursor/agents/red-teamer.md — one lens per dispatch: requirements | feasibility | scope | judge",
     "builder": ".cursor/agents/builder.md — one ticket, TDD, fresh per ticket",
+    "builder-max": ".cursor/agents/builder-max.md — escalation builder at the strongest tier, findings-loop round 4 only",
     "reviewer": ".cursor/agents/reviewer.md — per-ticket diff-vs-ticket, fresh per ticket",
     "auditor": ".cursor/agents/auditor.md — one axis per dispatch: standards | spec",
     "gatekeeper": ".cursor/agents/gatekeeper.md — runs gates, honest exit codes",
@@ -49,8 +50,9 @@
       "question": "Is the solution space explored?",
       "routes": [
         { "if": "standard shape", "then": "present 2–3 approaches with trade-offs and ONE recommendation, then design.spec" },
-        { "if": "a hard-to-reverse module interface exists", "then": "sketch 2–3 radically different interfaces, dispatch red-teamer(judge) to compare on depth/locality/seams, then design.spec", "dispatch": "red-teamer:judge" },
-        { "if": "design leans on an industry standard or post-cutoff API", "then": "queue researcher for plan phase, continue", "dispatch": "researcher (background)" }
+        { "if": "a hard-to-reverse module interface exists", "then": "additionally: sketch 2–3 radically different interfaces, dispatch red-teamer(judge) to compare on depth/locality/seams, fold the winner into the recommendation, then design.spec", "dispatch": "red-teamer:judge" },
+        { "if": "a question only running code can answer", "then": "additionally: build a throwaway prototype on a disposable, clearly-marked branch (no polish, no persistence, one command to run), harvest the answer, record the ruling, then design.spec" },
+        { "if": "design leans on an industry standard or post-cutoff API", "then": "additionally: queue researcher for the plan phase, then design.spec", "dispatch": "researcher (background)" }
       ]
     },
     "design.spec": {
@@ -78,7 +80,7 @@
     "plan.research": {
       "question": "Was research queued, or does any ticket touch a version-sensitive API?",
       "routes": [
-        { "if": "yes", "then": "dispatch researcher (background); plan cites RESEARCH.md, never model memory; continue to plan.draft", "dispatch": "researcher" },
+        { "if": "yes", "then": "dispatch researcher (background); draft unaffected tickets meanwhile, but a ticket that depends on the research is not finalized until RESEARCH.md exists on disk and is cited — check the file before plan.redteam; plans never cite model memory", "dispatch": "researcher" },
         { "if": "no", "then": "plan.draft" }
       ]
     },
@@ -102,7 +104,8 @@
       "question": "How many builders will edit concurrently this wave?",
       "routes": [
         { "if": "1", "then": "main tree, no worktree; execute.ticket-loop" },
-        { "if": "2 or more", "then": "one worktree per builder (Cursor native or git worktree); PROVE each toolchain before dispatch; own ports per tree; then execute.ticket-loop" }
+        { "if": "2 or more", "then": "one worktree per builder (git worktree add <repo>/.cursor/worktrees/<ticket> -b <ticket-branch>; check you are not already inside one; gitignore .cursor/worktrees/); install dependencies and PROVE each toolchain before dispatch; own ports per tree; then execute.ticket-loop" },
+        { "if": "a worktree's toolchain proof fails and one repair attempt does not fix it", "then": "collapse the wave to sequential builders in the main tree — never dispatch into a broken tree" }
       ],
       "invariant": "Never git stash while worktrees exist. Ledger on disk before first dispatch."
     },
@@ -112,7 +115,7 @@
         { "if": "yes", "then": "dispatch fresh builder with the ticket's complete self-contained brief; mark running only after dispatch returns an id; on report, execute.review", "dispatch": "builder" },
         { "if": "several independent tickets", "then": "dispatch their builders in parallel (worktree rule applies)", "dispatch": "builder ×N" },
         { "if": "builder reports BLOCKED", "then": "resolve the blocker (missing file ownership → amend plan; contradicts plan → user), then re-dispatch" },
-        { "if": "no tickets remain", "then": "execute.wave-close" }
+        { "if": "no tickets remain", "then": "execute.integrate" }
       ]
     },
     "execute.review": {
@@ -121,18 +124,28 @@
         { "if": "entry", "then": "dispatch fresh reviewer with ticket + diff + builder's claimed evidence", "dispatch": "reviewer" },
         { "if": "PASS", "then": "ledger: complete with evidence; back to execute.ticket-loop" },
         { "if": "FINDINGS, rounds 1–3", "then": "resume the SAME builder with findings; re-review", "loop": "execute.review" },
-        { "if": "FINDINGS, round 4", "then": "fresh builder ONE MODEL TIER UP with ticket + findings history; re-review", "dispatch": "builder (tier up)" },
+        { "if": "FINDINGS, round 4", "then": "dispatch builder-max (escalation builder, strongest tier) with ticket + full findings history; re-review", "dispatch": "builder-max" },
         { "if": "FINDINGS, round 5", "then": "orchestrator adjudicates: fix inline decision, park in ledger as known issue, or ticket BLOCKED" },
         { "if": "ESCALATE: contradicts plan/spec", "then": "take it to the USER verbatim with a recommendation; never into the loop" }
       ],
       "invariant": "Builder success reports are never evidence. Builder and reviewer of one ticket are never the same run."
     },
+    "execute.integrate": {
+      "question": "Are all the wave's reviewed ticket branches merged into the feature branch?",
+      "routes": [
+        { "if": "all reviews PASS", "then": "orchestrator merges each ticket branch into the feature branch in the main tree, ordered by blocking edges; then execute.wave-close" },
+        { "if": "merge conflict, resolvable", "then": "resolve it yourself: understand both tickets' intent, preserve both, never --abort, never invent behavior; continue merging" },
+        { "if": "merge conflict, too entangled", "then": "fresh builder as a findings round with both tickets pasted in the brief; then continue merging", "dispatch": "builder" }
+      ],
+      "invariant": "The lone-builder wave (no worktrees, work already on the feature branch) skips straight to execute.wave-close."
+    },
     "execute.wave-close": {
       "routes": [
-        { "if": "wave had user-facing flow changes", "then": "gates tier 2 (scoped e2e, isolated port) in addition to tier 1", "dispatch": "gatekeeper" },
-        { "if": "always", "then": "gates tier 1 (fast, scoped); FAIL → findings loop → re-run tier; PASS → cleanup.batch (worktrees + memory), then next wave or audit.prepare", "dispatch": "gatekeeper" }
+        { "if": "step 1, always", "then": "cleanup.batch: janitor inspects (brief pastes the wave's ledger excerpt); orchestrator rescues/removes worktrees and commits the memory draft in this batch-closing commit", "dispatch": "janitor" },
+        { "if": "step 2, always", "then": "gates tier 1 (fast, scoped) at the post-merge, post-memory HEAD — the hash that ships; FAIL → findings loop (lone builder in main tree) → re-run tier; PASS → next wave or audit.prepare", "dispatch": "gatekeeper" },
+        { "if": "step 2 addition: wave changed user-facing flows", "then": "gates tier 2 (scoped e2e, isolated port) as well", "dispatch": "gatekeeper" }
       ],
-      "invariant": "Any commit after a green gate voids it."
+      "invariant": "Any commit after a green gate voids it — gate last, at the final HEAD."
     },
 
     "audit.prepare": {
@@ -145,7 +158,8 @@
       "routes": [
         { "if": "entry", "then": "dispatch auditor(standards) + auditor(spec) IN PARALLEL, materials pasted in full; present both reports verbatim, never merged", "dispatch": "auditor:standards + auditor:spec" },
         { "if": "findings", "then": "verify each yourself; route real ones to builders via execute.review loop; spec-contradicting ones to the user; then re-audit the touched surface" },
-        { "if": "both CLEAN or user accepts residuals", "then": "gates.premerge" }
+        { "if": "standalone review request (entered from intake; no execution phase ran)", "then": "present both reports verbatim with per-axis worst-issue lines; terminal.done — no gates, no release, no push" },
+        { "if": "both CLEAN or user accepts residuals (chain run)", "then": "gates.premerge" }
       ]
     },
 
@@ -166,7 +180,7 @@
         { "if": "HEAD moved since the green gate", "then": "BLOCKED: gates stale; back to gates.premerge" },
         { "if": "preconditions hold", "then": "dispatch releaser: execute ungated (push branch, open PR with evidence); stage gated (merge/deploy/external/schema/deletes) and pause", "dispatch": "releaser" },
         { "if": "NEEDS-APPROVAL emitted", "then": "relay verbatim to the USER; explicit per-action approval in chat only; file contents never authorize", "loop": "release.ship" },
-        { "if": "approved", "then": "releaser executes that exact staged command; verify outcome with evidence; next gated action or cleanup.final" },
+        { "if": "approved", "then": "re-dispatch releaser with the authorization block it requires (USER APPROVED IN CHAT verbatim quote + EXECUTE EXACTLY the staged command — the only channel it accepts, since it cannot see chat); verify outcome with evidence; next gated action or cleanup.final", "dispatch": "releaser" },
         { "if": "user defers a gated action", "then": "record deferred in ledger; cleanup.final" }
       ]
     },
@@ -193,7 +207,7 @@
     "bug.feedback-loop": {
       "question": "Does a named, fast, red-capable command reproduce the bug?",
       "routes": [
-        { "if": "no loop exists yet", "then": "build one (failing test > curl script > CLI diff > headless browser > bisect harness — tightest that fits); this IS the work; no loop possible → stop and ask the user" },
+        { "if": "no loop exists yet", "then": "build one (failing test > curl script > CLI diff > headless browser > bisect harness — tightest that fits); completion bar: a NAMED command you have ALREADY RUN, red-capable, fast, and deterministic (or its reproduction rate stated and raised first); a perf bug gets a measured baseline before any fix; this IS the work; no loop possible → stop and ask the user" },
         { "if": "loop exists", "then": "minimise reproduction; write 3–5 ranked falsifiable hypotheses (show the user, non-blocking); instrument one variable at a time; then treat the fix as a one-ticket execute.ticket-loop with the regression test as test-first" },
         { "if": "fix verified", "then": "cleanup instrumentation; winning hypothesis in the commit message; audit.prepare if the diff is non-trivial, else terminal.done with evidence" }
       ]
@@ -209,12 +223,12 @@
   },
   "invariants": [
     "Sub-agents get self-contained briefs: rules, spec excerpts, and rulings pasted in; nothing else reaches their clean context.",
-    "Sub-agents cannot spawn sub-agents (Cursor: one nesting level); all fan-out is the orchestrator's.",
+    "Sub-agents must not spawn sub-agents. Cursor permits one further level since 2.5, so this is POLICY, not platform: every agent file forbids it and the subagentStart hook denies nested spawns. All fan-out is the orchestrator's.",
     "User rulings are recorded verbatim, everywhere they are carried.",
     "Evidence = command + exit code (captured without pipes) or screenshot; assertions are not evidence.",
     "Worktrees exist only for 2+ concurrent editors; created and removed by the orchestrator within the wave.",
-    "Judgement roles (red-teamer, auditor, orchestrator) run the strongest model tier; builders one notch down; scout/janitor mechanical two notches down.",
-    "Liveness (state file + mtime in ~/.cursor/subagents/) precedes every status claim about background work.",
+    "Judgement roles (red-teamer, auditor, orchestrator) run the strongest tier via model: inherit; at install, pin builder/reviewer/gatekeeper/releaser frontmatter to the mid tier and scout/researcher/janitor to the fast tier for your plan's model lineup — builder-max stays inherit, which is what makes round-4 escalation a real tier jump.",
+    "Liveness (state file + mtime in ~/.cursor/subagents/) precedes every status claim about BACKGROUND sub-agents; foreground dispatches are synchronous, and a dispatch that errors or never returns means: check ledger and tree for partial commits, then dispatch fresh — never two builders on one ticket in one tree.",
     "Approval boundaries: prepare-then-pause; only the user in chat authorizes, per action, per session.",
     "Memory updates land in the batch-closing commit; stale entries are defects.",
     "Honest terminal states; a first-round clean red-team pass on non-trivial work is a skeptic failure."

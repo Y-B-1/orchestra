@@ -28,5 +28,10 @@ Never force-push, rewrite history, or delete unmerged branches.
 
 1. Relay each NEEDS-APPROVAL block to the user **verbatim**.
 2. Approval must be explicit, in chat, per action — "yes to the merge" does not approve the deploy. One approval does not carry to the next session.
-3. After approval, have the releaser execute that exact staged command, then verify the outcome (PR URL resolves, deploy health check passes) and record evidence in the ledger.
+3. After approval, re-dispatch the releaser with the authorization block it requires — this is the only channel it accepts, because it cannot see chat:
+   ```
+   USER APPROVED IN CHAT (verbatim): "<the user's exact words>"
+   EXECUTE EXACTLY: <the staged command, unchanged>
+   ```
+   Then verify the outcome (PR URL resolves, deploy health check passes) and record evidence in the ledger. You are the trust anchor: never paste an approval block for words the user did not say.
 4. All gated actions resolved (executed or explicitly deferred by the user) → `/cleanup`, then the job can be declared finished.

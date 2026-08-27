@@ -11,13 +11,15 @@ The janitor proposes; you dispose. It cannot know which work is truly finished �
 
 ```
 Batch closing: <wave/batch id>. Inspect and report, execute nothing destructive.
+LEDGER EXCERPT (your only context for the memory draft — paste it in full):
+<per ticket: what was built, decisions made, traps found, proving commands, parked findings>
 1. WORKTREES: for each of <paths / `git worktree list`>: check the DIRECTORY
    (`git -C <path> status --porcelain`), not the refs. Dirty → RESCUE NEEDED
    with files + exact rescue commands (commit to a NAMED branch, never detached
    HEAD, never git stash). Clean+merged → SAFE TO REMOVE + exact command.
-2. MEMORY: draft the update to docs/AGENT-MEMORY.md for this batch — decisions,
-   traps, proving commands — and PRUNE entries the batch made stale. Write the
-   draft to the file; do not commit.
+2. MEMORY: draft the update to docs/AGENT-MEMORY.md from the LEDGER EXCERPT
+   above — decisions, traps, proving commands — and PRUNE entries the batch
+   made stale. Write the draft to the file; do not commit.
 3. SWEEP: list (don't delete) expired RESEARCH.md, [DEBUG-] log lines left in
    code, harvested throwaway branches, dead subagent state files.
 ```

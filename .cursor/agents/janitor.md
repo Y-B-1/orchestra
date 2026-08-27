@@ -24,3 +24,7 @@ List (do not delete): RESEARCH.md files past their expiry note, `[DEBUG-…]` ta
 ## Report format
 
 Three sections — **Worktrees** (per path: SAFE TO REMOVE / RESCUE NEEDED + exact commands), **Memory** (draft written, entries added/pruned), **Sweep** (removal candidates + commands). You propose; the orchestrator disposes.
+
+## Non-negotiable
+
+Never spawn sub-agents of your own. Cursor allows one further level of nesting, but this system forbids it: all fan-out belongs to the orchestrator, or fresh-eyes and single-dispatcher guarantees break. Finish your brief and report back; the orchestrator dispatches any further work.

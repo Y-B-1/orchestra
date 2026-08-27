@@ -2,7 +2,10 @@
   "version": 1,
   "hooks": {
     "beforeShellExecution": [
-      { "command": "./.cursor/hooks/block-dangerous-git.sh", "timeout": 10 }
+      { "command": "./.cursor/hooks/block-dangerous.py", "timeout": 10 }
+    ],
+    "subagentStart": [
+      { "command": "./.cursor/hooks/block-nested-subagents.py", "timeout": 10 }
     ]
   }
 }

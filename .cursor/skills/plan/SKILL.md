@@ -9,7 +9,7 @@ Goal: `docs/plans/YYYY-MM-DD-<feature>.md` — a plan a fresh session can execut
 
 ## Phase 1 — Recon (always)
 
-Dispatch `/scout-recon`: map the spec against the codebase. The report names files and symbols (never line numbers), conventions, and the exact verification commands available.
+Dispatch `/scout-recon`: map the spec against the codebase. The report names files and symbols (never line numbers), conventions, and the exact verification commands available. Also have the scout harvest the `.cursor/rules` and AGENTS.md excerpts that govern the paths the work will touch — ticket briefs must restate those rules verbatim, and the orchestrator cannot restate what nobody harvested.
 
 ## Phase 2 — Research (when triggered)
 
@@ -20,7 +20,7 @@ If design queued research, or any ticket touches a post-cutoff API: dispatch `/r
 Structure the work as **tracer-bullet tickets**: each a thin end-to-end slice one fresh builder session can hold. Ship the thinnest full pipe first; widen after it is verified. Every ticket carries:
 
 - **Files owned** — exact list, including sibling files (tests, styles, types). Two tickets never own the same file unless a blocking edge orders them.
-- **Test first** — the test that goes RED before implementation, named.
+- **Test first** — the test that goes RED before implementation, named, asserting at a **seam agreed in the design** (public interface, never internals or mocks).
 - **done_when** — a mechanical yes/no command ("`npm test -- auth` exits 0"), plus guards so the letter cannot beat the intent ("without reducing coverage").
 - **Scoped verification** — the fast checks and any scoped e2e specs for this ticket.
 - **Blocking edges** — which tickets must land first.
@@ -40,4 +40,4 @@ The plan is **NOT-READY** until all three return READY. Repair and re-dispatch t
 
 ## Hand-off
 
-Terminal state: invoke `/execute` with the plan path. The plan file, not this conversation, is the source of truth from here.
+Commit the plan (and the spec, if design left it uncommitted) before execution begins — on-disk state is the source of truth, and an uncommitted plan can be lost to any tree operation. Terminal state: invoke `/execute` with the plan path. The plan file, not this conversation, is the source of truth from here.

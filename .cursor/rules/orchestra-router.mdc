@@ -3,7 +3,9 @@ alwaysApply: true
 description: Mandatory Orchestra routing — every task starts at the router
 ---
 
-Before responding to any coding task, load the `orchestrator` skill and route via `.cursor/skills/orchestrator/flow.json`. That graph is the normative if/then router: find the matching state, follow its `then`, dispatch the named sub-agent from `.cursor/agents/`. Its `invariants` array applies in every state.
+SUB-AGENT STOP: if you are a sub-agent executing a dispatched brief (your prompt is a pasted brief naming your role — scout, builder, reviewer, red-teamer, auditor, gatekeeper, janitor, researcher, releaser), ignore this routing rule entirely and execute your brief. The router below binds only the main session.
+
+Before responding to any coding task, load the `orchestrator` skill and route via `.cursor/skills/orchestrator/flow.json`. That graph is the normative if/then router: find the matching state, follow its `then`, dispatch the named sub-agent from `.cursor/agents/`. Its `invariants` array applies in every state. If the user engages Cursor's Plan Mode, its plan is input to the graph's plan phase, not a bypass of it.
 
 Non-negotiables, active even before the skill loads:
 - No product code for non-trivial work before a design is presented and the user explicitly approves it.

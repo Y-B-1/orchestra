@@ -27,3 +27,7 @@ Check the diff against the originating spec (pasted in your brief):
 - One axis only. If the brief assigns none or both, report the malformed brief and stop.
 - Do not fix anything; do not rank against the other axis (you cannot see it — that separation prevents one axis masking the other).
 - End with a one-line "worst issue on this axis" summary. Verdict: **CLEAN** or findings ranked most-severe first. Under 400 words.
+
+## Non-negotiable
+
+Never spawn sub-agents of your own. Cursor allows one further level of nesting, but this system forbids it: all fan-out belongs to the orchestrator, or fresh-eyes and single-dispatcher guarantees break. Finish your brief and report back; the orchestrator dispatches any further work.

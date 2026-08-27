@@ -16,7 +16,7 @@ You are the main session. Announce which skill you are using, then follow it exa
 | Request shape | Route |
 |---|---|
 | Build a feature, non-trivial change | `/design` → `/plan` → `/execute` → `/audit` → `/gates` → `/release` → `/cleanup` |
-| Bug, failing test, "it's broken" | Build a feedback loop first (a named, red-capable, fast command that reproduces it), then treat the fix as a one-ticket `/execute` |
+| Bug, failing test, "it's broken" | `/diagnose` — feedback loop first, then the fix as a one-ticket `/execute` |
 | Trivial change (one file, obvious, reversible) | Two-sentence design in chat, then do it inline; still evidence-gate the DONE |
 | Unknown API / external dependency | `/research` before planning |
 | "Review this branch/PR" | `/audit` standalone |
@@ -27,15 +27,24 @@ Never skip design for non-trivial work. The hard gate: **no product code until a
 ## Dispatch discipline
 
 1. **Self-contained briefs.** Sub-agents start with a clean context: no chat history, no AGENTS.md, no rules. Everything a role needs — the spec excerpt, the verbatim rulings, the file list, the commands, the constraints — is pasted into its brief. Each role's skill (`/scout-recon`, `/red-team`, …) contains the brief template; use it.
-2. **Parallelism.** Independent sub-agents dispatch in one message so they run concurrently (up to 8). Dependent work waits for its input.
-3. **No nesting.** Sub-agents cannot spawn sub-agents. Any fan-out is yours to sequence.
-4. **Liveness before status.** Background sub-agents write state to `~/.cursor/subagents/`; check it before claiming anything is running or done.
-5. **Model routing.** Judgement (yours, red-teamers, auditors) on the strongest tier; builders one notch down; scout/janitor mechanical work two notches down. Set via agent frontmatter `model:` field; hold constant mid-session.
+2. **Parallelism.** Independent sub-agents dispatch in one message so they run concurrently. Dependent work waits for its input.
+3. **No nesting, by policy.** Cursor permits sub-agents one further level of children; this system forbids it — every agent file says so and the subagentStart hook denies it. Any fan-out is yours to sequence.
+4. **Liveness before status.** Background sub-agents write state to `~/.cursor/subagents/`; check it before claiming anything is running or done. Foreground dispatches are synchronous; one that errors or never returns means: check the ledger and tree for partial commits, then dispatch fresh.
+5. **Model routing.** Judgement roles (red-teamer, auditor, builder-max) keep `model: inherit` (the ceiling); the rest are pinned lower in their frontmatter at install. Hold settings constant mid-session.
 6. **Context budget.** Keep yourself lean: push searches, bulk reads, and verification into sub-agents that return one result. Keep state on disk (spec, plan, ledger, commits), not in conversation. At a phase boundary with a heavy window, prefer finishing the phase and starting fresh from the on-disk state.
 
 ## Verbatim rulings
 
 When the user decides anything, record the decision **word-for-word** in the spec/plan. Paraphrase drift is the top audited failure across this system.
+
+## Cursor-native features
+
+- **Plan Mode**: if the user runs Cursor's Plan Mode, treat its output as input to `/plan` — it still gets tickets, ownership, and the three-lens red team. Never fight the native feature; fold it in.
+- **Custom Modes**: pinning the orchestrator skill as a Custom Mode keeps the router active every turn; recommend it to the user once.
+
+## Handoff
+
+Ending a session another session will continue: write `docs/plans/<feature>-handoff.md` — current flow.json state, ledger path, open findings, staged-but-unapproved commands, and the next action. State lives on disk (spec, plan, ledger, commits); the handoff file is the pointer map, never a duplicate of content. The next session enters the graph at the recorded state.
 
 ## Terminal states
 

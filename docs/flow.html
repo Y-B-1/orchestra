@@ -58,6 +58,7 @@
   <div class="state"><h3>researcher <span class="role r-researcher">background</span></h3><p>Primary-source research → cited RESEARCH.md with expiry.</p></div>
   <div class="state"><h3>red-teamer <span class="role r-red">read-only</span></h3><p>One lens per dispatch: requirements · feasibility · scope · judge.</p></div>
   <div class="state"><h3>builder</h3><p>One ticket, TDD, assigned tree, evidence-gated report. Fresh per ticket.</p></div>
+  <div class="state"><h3>builder-max <span class="role r-builder">ceiling tier</span></h3><p>Escalation builder, findings-loop round 4 only. Reads the failure history first.</p></div>
   <div class="state"><h3>reviewer <span class="role r-reviewer">read-only</span></h3><p>Fresh eyes on one ticket's diff. Builder reports are never evidence.</p></div>
   <div class="state"><h3>auditor <span class="role r-auditor">read-only</span></h3><p>Whole-diff review, one axis: Standards or Spec. Run in parallel, never merged.</p></div>
   <div class="state"><h3>gatekeeper</h3><p>Runs gate tiers, reports honest exit codes at a named commit. Fixes nothing.</p></div>
@@ -133,23 +134,30 @@
 <tr><td class="if">unblocked ticket</td><td class="then">fresh builder, complete self-contained brief; "running" only after dispatch returns an id <span class="role r-builder">builder</span></td></tr>
 <tr><td class="if">several independent tickets</td><td class="then">parallel builders (worktree rule applies) <span class="role r-builder">builder ×N</span></td></tr>
 <tr><td class="if">builder BLOCKED</td><td class="then">resolve (amend plan / user), re-dispatch</td></tr>
-<tr><td class="if">no tickets left</td><td class="then">execute.wave-close</td></tr>
+<tr><td class="if">no tickets left</td><td class="then">execute.integrate</td></tr>
 </table></div>
 <div class="arrow">↓</div>
 <div class="state gate"><h3>execute.review: per-ticket gate + bounded findings loop</h3><table>
 <tr><td class="if">builder reports DONE</td><td class="then">fresh reviewer on diff + ticket + claimed evidence <span class="role r-reviewer">reviewer</span></td></tr>
 <tr><td class="if">PASS</td><td class="then">ledger complete with evidence → next ticket</td></tr>
 <tr><td class="if">findings, rounds 1–3</td><td class="then">same builder resumes</td></tr>
-<tr><td class="if">findings, round 4</td><td class="then">fresh builder <b>one model tier up</b> <span class="role r-builder">builder ↑</span></td></tr>
+<tr><td class="if">findings, round 4</td><td class="then">escalation builder at the ceiling tier, full findings history <span class="role r-builder">builder-max</span></td></tr>
 <tr><td class="if">findings, round 5</td><td class="then">orchestrator adjudicates: fix / park in ledger / BLOCKED</td></tr>
 <tr><td class="if">finding contradicts plan/spec</td><td class="then"><b>to the user</b>, verbatim, never into the loop</td></tr>
 </table></div>
 <div class="arrow">↓</div>
-<div class="state"><h3>execute.wave-close</h3><table>
-<tr><td class="if">always</td><td class="then">gates tier 1 (fast, scoped); fail → findings loop → re-run <span class="role r-gatekeeper">gatekeeper</span></td></tr>
-<tr><td class="if">user-facing flows changed</td><td class="then">tier 2 scoped e2e on an isolated port <span class="role r-gatekeeper">gatekeeper</span></td></tr>
-<tr><td class="if">wave closes</td><td class="then">cleanup.batch (worktrees + memory in the closing commit) <span class="role r-janitor">janitor</span></td></tr>
-</table><p class="note">Any commit after a green gate voids it.</p></div>
+<div class="state"><h3>execute.integrate</h3><p class="q">Are the wave's ticket branches merged back?</p><table>
+<tr><td class="if">all reviews PASS</td><td class="then">orchestrator merges each ticket branch into the feature branch, ordered by blocking edges</td></tr>
+<tr><td class="if">merge conflict, resolvable</td><td class="then">resolve in daylight: understand both tickets' intent, preserve both, never <code>--abort</code></td></tr>
+<tr><td class="if">conflict too entangled</td><td class="then">fresh builder as a findings round, both tickets in the brief <span class="role r-builder">builder</span></td></tr>
+<tr><td class="if">lone-builder wave</td><td class="then">nothing to merge; straight to wave-close</td></tr>
+</table></div>
+<div class="arrow">↓</div>
+<div class="state"><h3>execute.wave-close (in this order)</h3><table>
+<tr><td class="if">1. batch close</td><td class="then">janitor inspects directories (brief pastes the ledger excerpt); rescue/remove; memory lands in this batch-closing commit <span class="role r-janitor">janitor</span></td></tr>
+<tr><td class="if">2. gate</td><td class="then">tier 1 (fast, scoped) at the post-merge, post-memory HEAD; fail → findings loop → re-run <span class="role r-gatekeeper">gatekeeper</span></td></tr>
+<tr><td class="if">user-facing flows changed</td><td class="then">tier 2 scoped e2e on an isolated port as well <span class="role r-gatekeeper">gatekeeper</span></td></tr>
+</table><p class="note">Gate last, at the final HEAD: any commit after a green gate voids it.</p></div>
 </div>
 
 <h2>Audit → Gates → Release</h2>
@@ -157,7 +165,8 @@
 <div class="state"><h3>audit.run: two axes, parallel, never merged</h3><table>
 <tr><td class="if">entry</td><td class="then">Standards axis + Spec axis, materials pasted in full <span class="role r-auditor">auditor ×2</span></td></tr>
 <tr><td class="if">findings</td><td class="then">verify each → builders via findings loop; spec-contradicting → user; re-audit touched surface</td></tr>
-<tr><td class="if">both CLEAN / residuals accepted</td><td class="then">gates.premerge</td></tr>
+<tr><td class="if">standalone review request</td><td class="then">present both reports, terminal.done — no gates, no release, no push</td></tr>
+<tr><td class="if">chain run, both CLEAN / residuals accepted</td><td class="then">gates.premerge</td></tr>
 </table></div>
 <div class="arrow">↓</div>
 <div class="state"><h3>gates.premerge: tier 3 derived impact set</h3><table>
@@ -172,7 +181,7 @@
 <tr><td class="if">HEAD moved since green gate</td><td class="then">BLOCKED: gates stale → back to gates.premerge</td></tr>
 <tr><td class="if">preconditions hold</td><td class="then">execute ungated (push branch, PR with evidence); stage gated and pause <span class="role r-releaser">releaser</span></td></tr>
 <tr><td class="if">NEEDS-APPROVAL</td><td class="then">relay verbatim; <b>only the user in chat authorizes</b>, per action, per session</td></tr>
-<tr><td class="if">approved</td><td class="then">execute that exact staged command; verify outcome with evidence</td></tr>
+<tr><td class="if">approved</td><td class="then">re-dispatch releaser with the authorization block (user's verbatim words + EXECUTE EXACTLY the staged command — the only channel it accepts); verify outcome with evidence <span class="role r-releaser">releaser</span></td></tr>
 </table></div>
 <div class="arrow">↓</div>
 <div class="state"><h3>cleanup.final → terminal.done</h3><table>
@@ -194,7 +203,7 @@
 <h2>Invariants (active in every state)</h2>
 <div class="inv"><ul>
 <li>Sub-agent briefs are <b>self-contained</b>; clean context means nothing else arrives.</li>
-<li>Sub-agents cannot spawn sub-agents; all fan-out belongs to the orchestrator.</li>
+<li>Sub-agents never spawn sub-agents — policy, enforced by every agent file and the subagentStart hook; all fan-out belongs to the orchestrator.</li>
 <li>User rulings travel <b>verbatim</b>.</li>
 <li>Evidence = command + exit code (no pipes) or screenshot; assertions are not evidence.</li>
 <li>Worktrees only for 2+ concurrent editors; created and removed by the orchestrator within the wave.</li>
