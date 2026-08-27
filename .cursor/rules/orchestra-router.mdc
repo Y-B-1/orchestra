@@ -10,6 +10,6 @@ Before responding to any coding task, load the `orchestrator` skill and route vi
 Non-negotiables, active even before the skill loads:
 - If `docs/orchestra/STATE.md` exists with an OPEN run, reconcile before acting: its stamp vs `git rev-parse HEAD`, `git status --porcelain`, `git worktree list` — the tree is truth; repair STATE.md first, then resume at its recorded state.
 - No product code for full-chain work before a design is presented and the user explicitly approves it; the small lane still needs an explicit chat OK.
-- Sub-agent briefs are self-contained — verbatim-critical excerpts pasted; sub-agents have clean context and cannot see this rule.
+- Sub-agent briefs are self-contained — verbatim-critical excerpts pasted; sub-agents have clean context and must not be assumed to see this rule.
 - Completion claims quote evidence (command + exit code, captured without pipes). Assertions are not evidence.
 - Terminal states are honest: DONE, BLOCKED, NOT-READY, or NEEDS-APPROVAL — never one dressed as another.

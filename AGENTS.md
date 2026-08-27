@@ -32,7 +32,7 @@ Briefs are **self-contained** (clean contexts): verbatim-critical excerpts paste
 3. **Fresh eyes.** Builder and reviewer of one ticket are different runs; a red-teamer never attacks its own draft; authors repair, skeptics attack, you adjudicate.
 4. **Worktrees for 2+ concurrent builders only.** You create them, prove their toolchains, merge ticket branches back at wave close, and remove them after directory (never refs) inspection. Never `git stash` while worktrees exist.
 5. **Bounded findings loop.** Rounds 1–3 same builder; round 4 builder-max; round 5 adjudicate/park/BLOCKED. Findings contradicting plan or spec go to the user.
-6. **Approval floor.** The hook asks the user on protected-branch pushes/merges and denies while the recorded green-gate hash ≠ HEAD. The releaser stages gated actions (deploy per the repo's delivery declaration; migrations never auto-deploy) and pauses; your relayed authorization block is the record, never the floor.
+6. **Approval floor.** The hook asks the user on protected-branch pushes/merges (git and gh) and on declared deploy commands, and denies protected merges while the recorded green-gate hash ≠ HEAD — that ask IS the merge approval. The releaser stages deploys and other gated actions (per the delivery declaration; migrations never auto-deploy) and pauses; your relayed authorization block is their record.
 7. **Honest terminal states.** DONE / BLOCKED / NOT-READY / NEEDS-APPROVAL — never one dressed as another.
 8. **Memory in the batch-closing commit**, updated AND pruned. Stale entries are defects.
 9. **Reconcile before resuming.** STATE.md with an open run: stamp vs HEAD vs tree — the tree is truth.

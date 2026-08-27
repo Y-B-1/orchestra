@@ -18,6 +18,10 @@ out=$(echo '{"command":"git status"}' | ./.cursor/hooks/block-dangerous.py)
 echo "$out" | grep -q '"allow"' || bad "git status not allowed: $out"
 out=$(echo '{"command":"sh -c \"git push --force\""}' | ./.cursor/hooks/block-dangerous.py)
 echo "$out" | grep -q '"deny"' || bad "interpreter-wrapped force push not denied: $out"
+out=$(echo '{"command":"env CI=1 git push --force"}' | ./.cursor/hooks/block-dangerous.py)
+echo "$out" | grep -q '"deny"' || bad "env-prefixed force push not denied: $out"
+out=$(echo '{"command":"gh pr merge 42 --squash"}' | ./.cursor/hooks/block-dangerous.py)
+echo "$out" | grep -Eq '"(ask|deny)"' || bad "gh pr merge not gated: $out"
 
 say "== 3. Nested-subagent self-test (synthetic payload)"
 rm -f .orchestra/subagent-children.json
@@ -40,16 +44,17 @@ import json, re, os, sys
 d = json.load(open('.cursor/skills/orchestrator/flow.json'))
 s = set(d['states']); roles = set(d['roles']); ok = True
 for k, v in d['states'].items():
+    for disp in [v.get('dispatch', '')] + [r.get('dispatch', '') for r in v.get('routes', [])]:
+        for tok in re.split(r'[+|]', disp):
+            base = tok.strip().split(':')[0].split('@')[0]
+            if base and base not in roles: print(f"FAIL: unknown role {base} in {k}"); ok = False
     for r in v.get('routes', []):
         for e in (r.get('next'), r.get('back_to')):
             if e and e not in s: print(f"FAIL: dangling edge {k} -> {e}"); ok = False
-        for tok in re.split(r'[+|]', r.get('dispatch', '')):
-            base = tok.strip().split(':')[0].split('@')[0]
-            if base and base not in roles: print(f"FAIL: unknown role {base} in {k}"); ok = False
 for role, path in d['roles'].items():
     if role != 'orchestrator' and not os.path.exists(path.split(' ')[0]):
         print(f"FAIL: missing agent file for {role}"); ok = False
-for dead in ('scout-recon', 'build-wave', 'review-gate'):
+for dead in ('scout-recon', 'research', 'red-team', 'build-wave', 'review-gate'):
     if os.path.isdir(f'.cursor/skills/{dead}'): print(f"FAIL: retired skill present: {dead}"); ok = False
 if not os.path.exists('.cursor/skills/orchestrator/briefs.md'): print("FAIL: briefs.md missing"); ok = False
 sys.exit(0 if ok else 1)
@@ -61,6 +66,7 @@ grep -q '^\.orchestra/\*' .gitignore || { printf '.orchestra/*\n!.orchestra/deli
 grep -q '^\.cursor/worktrees/' .gitignore || { echo ".cursor/worktrees/" >> .gitignore; say "added .cursor/worktrees/ to .gitignore"; }
 
 say "== 7. Delivery declaration"
+grep -q 'Delivery: <declare' AGENTS.md 2>/dev/null && bad "AGENTS.md Delivery line is still the placeholder — declare the repo's landing rule and deploy policy"
 [ -f .orchestra/delivery.json ] || { mkdir -p .orchestra; printf '{ "protected_branches": ["main"], "landing": "pr", "deploy": { "production": "approval" } }\n' > .orchestra/delivery.json; say "wrote default .orchestra/delivery.json — edit deploy policy per environment"; }
 
 say "== 8. Manual steps (cannot be verified here)"

@@ -33,5 +33,5 @@ Non-negotiable: never spawn sub-agents (enforced by hook; all fan-out belongs to
 ## Levels (the brief names one; default L2)
 
 - **L1**: one axis over a small diff (<200 lines); top findings only, under 200 words.
-- **L2 standard**: full axis review per the format below.
+- **L2 standard**: full axis review per the format above.
 - **L3**: full axis review of a multi-wave change-set, per-wave breakdown.

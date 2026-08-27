@@ -34,5 +34,5 @@ Non-negotiable: never spawn sub-agents (enforced by hook; all fan-out belongs to
 ## Levels (the brief names one; default L2)
 
 - **L1 spot-check**: one claim verified against one primary source; short answer, no RESEARCH.md file unless the brief asks.
-- **L2 standard**: full cited RESEARCH.md per the format below.
+- **L2 standard**: full cited RESEARCH.md per the format above.
 - **L3 survey**: multiple libraries/standards compared, with a recommendation section.

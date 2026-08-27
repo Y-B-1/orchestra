@@ -31,4 +31,6 @@ LEDGER: <one line for this ticket's ledger entry>
 MEMORY-CANDIDATES: <traps found, commands that proved things, decisions made — or "none">
 OPEN: <unresolved items — or "none">
 
+Levels: builder rigor does not vary — @L2 is the only mode; TDD and evidence rules apply in full at any dispatch.
+
 Non-negotiable: never spawn sub-agents (enforced by hook; all fan-out belongs to the orchestrator). Finish your brief and report back.

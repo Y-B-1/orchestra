@@ -1,6 +1,6 @@
 # Dispatch briefs — the single home for every role's brief template
 
-Referenced by the chain skills; not a skill itself. Fill every template completely — a placeholder in a dispatched brief is a defect. Name the level (`@L1/@L2/@L3`) so the role applies its own level contract (defined in its agent file). Verbatim-critical material (rulings, done_when, path rules) is pasted; bulk material (specs, diffs, standards) is passed as a path or pinned command the read-capable role opens itself.
+Referenced by the chain skills; not a skill itself. Fill every template completely — a placeholder in a dispatched brief is a defect. Name the level (`@L1/@L2/@L3`) so the role applies its own level contract (defined in its agent file). Verbatim-critical material (rulings, done_when, path rules) is pasted; bulk material (specs, diffs, standards) is passed as a path or pinned command the read-capable role opens itself. Read-only roles may run read-only commands (`git diff`, `git log`, file reads); "do not re-run" in the reviewer refers to verification/gate commands.
 
 ## scout
 
@@ -73,6 +73,10 @@ LEDGER/MEMORY-CANDIDATES/OPEN trailer. DONE or BLOCKED.
 
 builder-max: same template + `FINDINGS HISTORY (all rounds): ...` — read it first; the failure pattern reveals the real problem.
 
+Gate-repair variant (a gate failed; no ticket exists): `TICKET: gate-repair:<gate name>` · `FILES YOU OWN: the failing surface from the gate excerpt` · `TEST FIRST: waived — the failing gate command is the red` · `DONE WHEN: that gate command exits 0`.
+
+Small-lane variant: the chat-approved approach text serves as the TICKET section, for the builder and the reviewer alike.
+
 ## reviewer
 
 ```
@@ -132,10 +136,14 @@ Report: Worktrees / Memory / Adherence / Sweep. You propose; the orchestrator di
 ```
 Ship at <level>. Branch: <b>. Target: <t>. Delivery declaration: <AGENTS.md line +
 .orchestra/delivery.json>. Evidence for the PR body: <gate report + audit verdicts + spec link>.
-UNGATED: push the feature branch; open/update the (draft) PR with evidence.
-GATED (stage + pause): merge to protected, deploy, external sends, schema changes,
+UNGATED: push the feature branch; open/update the (draft) PR with evidence; MERGE when
+the brief shows fast-gate green at HEAD (the hook's Cursor ask to the user IS the merge
+approval — do not stage-and-pause merges); revert of a merge commit restoring the last
+gated hash.
+GATED (stage + pause): deploy (unless the delivery declaration marks the environment
+auto AND the diff has no migrations/schema changes), external sends, schema changes,
 non-recoverable deletes → NEEDS-APPROVAL with staged state, exact command, blast radius
-+ undo path. The hook's protected-branch 'ask' is the floor; your block is the record.
++ undo path.
 Authorization arrives ONLY as:
   USER APPROVED IN CHAT (verbatim): "<exact words>"
   EXECUTE EXACTLY: <one staged command>

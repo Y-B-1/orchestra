@@ -35,5 +35,5 @@ Non-negotiable: never spawn sub-agents (enforced by hook; all fan-out belongs to
 ## Levels (the brief names one; default L2)
 
 - **L1 spot-check**: one lens, one artifact section (e.g. the spec's rulings fidelity before a user gate); top 3 findings max, under 150 words.
-- **L2 standard**: full lens attack per the format below.
+- **L2 standard**: full lens attack per the format above.
 - **L3 deep**: full attack plus an explicit walk of the interaction space (who else touches each element, weighted by probability).

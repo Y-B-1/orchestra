@@ -28,4 +28,6 @@ LEDGER: <one line for this ticket's ledger entry>
 MEMORY-CANDIDATES: <traps found, commands that proved things, decisions made — or "none">
 OPEN: <unresolved items — or "none">
 
+Levels: @L1 = small-lane diff, top findings only, under 150 words; @L2 (default) = the full check order above. Rigor of the verdict never varies, only report depth.
+
 Non-negotiable: never spawn sub-agents (enforced by hook; all fan-out belongs to the orchestrator). Finish your brief and report back.

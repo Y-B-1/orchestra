@@ -196,7 +196,7 @@
 </table></div>
 <div class="arrow">&darr;</div>
 <div class="state gate"><h3>release.merge &rarr; release.deploy</h3>
-<div class="always">Delivery declaration read (AGENTS.md + .orchestra/delivery.json). Hook floor: protected-branch push/merge asks the real user, and is denied while the green-gate hash &ne; HEAD.</div>
+<div class="always">Delivery declaration read (AGENTS.md + .orchestra/delivery.json). Hook floor: protected-branch push/merge (git and gh) asks the real user, and that ask IS the merge approval; denied while gates.last_green_hash &ne; HEAD. Merge done with nothing to deploy &rarr; straight to cleanup.</div>
 <table>
 <tr><td class="if">gate green at HEAD, branch rebased on main</td><td class="then">flip draft PR to ready with the gate report; merge, fast-forward, so the gated hash IS main's HEAD <span class="role r-releaser">releaser@L2</span></td></tr>
 <tr><td class="if">fast-forward impractical</td><td class="then">merge, then auto re-run the fast set at main HEAD; only that green releases a deploy <span class="role r-gatekeeper">gatekeeper@L1</span></td></tr>
@@ -209,6 +209,15 @@
 <div class="state"><h3>cleanup.final &rarr; terminal.done</h3><table>
 <tr><td class="if">closing</td><td class="then">zero live worktrees; ledger CLOSED; STATE.md idle (keeping any deferred: line); expired RESEARCH.md gone</td></tr>
 <tr><td class="if">declaring DONE</td><td class="then">quote the evidence; only then "job is finished". DONE / BLOCKED / NOT-READY / NEEDS-APPROVAL are all honest endings</td></tr>
+</table></div>
+</div>
+
+<h2>Bug lane</h2>
+<div class="phase">
+<div class="state"><h3>bug.feedback-loop</h3><p class="q">Does a named, already-run, red-capable, fast, deterministic command reproduce it?</p><table>
+<tr><td class="if">no loop yet</td><td class="then">build one (failing test &rarr; curl &rarr; CLI diff &rarr; headless browser &rarr; bisect harness); non-deterministic bugs get their reproduction rate raised and stated; perf bugs get a measured baseline first; no loop possible &rarr; stop and ask</td></tr>
+<tr><td class="if">loop exists</td><td class="then">minimise; 3&ndash;5 ranked falsifiable hypotheses (shown, non-blocking); instrument one variable at a time; the fix runs as one ticket through execute with the regression test first</td></tr>
+<tr><td class="if">fix verified, trivial diff</td><td class="then">clean instrumentation; winning hypothesis in the commit message &rarr; done with evidence</td></tr>
 </table></div>
 </div>
 

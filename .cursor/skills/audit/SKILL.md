@@ -17,4 +17,4 @@ Two fresh auditors in parallel, one axis each (brief: `briefs.md#auditor`). Not 
 - Present both reports **verbatim** under `## Standards` / `## Spec`, each with its worst-issue line. Never merge or re-rank across axes.
 - Verify each finding yourself; real ones route to builders as findings rounds; spec-contradicting ones go to the user; re-audit the touched surface after fixes.
 - **Standalone review**: present the reports and stop — no gates, no release, no push.
-- Chain run: audit residuals do not block the **merge** (fast-gate green is the merge requirement), but the **spec axis must be green before a production deploy and before declaring the run DONE** — an unimplemented requirement has no test to catch it; this is the cheapest whole-change-set check that exists.
+- Chain run: audit residuals do not block the **merge** (fast-gate green is the merge requirement). For change-sets where the audit fires (2+ tickets, or on request), the **spec axis must be green before a production deploy and before declaring the run DONE** — an unimplemented requirement has no test to catch it. Single-ticket runs rely on their reviewer's spec-match check instead.

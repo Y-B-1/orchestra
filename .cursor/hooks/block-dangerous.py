@@ -96,14 +96,41 @@ def analyze_git(tokens):
 
 def check_tokens(tokens):
     """Deny/ask rules over one command's tokens. Recurses into interpreter -c strings."""
-    while tokens and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[0]):
-        tokens = tokens[1:]
-    if tokens and tokens[0] in ("sudo", "command", "env", "nohup"):
-        tokens = tokens[1:]
+    # Strip wrapper layers to a fixpoint: VAR= assignments, sudo/command/env/nohup,
+    # and env's own short flags — so `sudo env CI=1 git push -f` still classifies.
+    while tokens:
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[0]):
+            tokens = tokens[1:]
+        elif tokens[0] in ("sudo", "command", "nohup"):
+            tokens = tokens[1:]
+        elif tokens[0] == "env":
+            tokens = tokens[1:]
+            while tokens and (tokens[0] in ("-i",) or tokens[0].startswith("-u")
+                              or re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[0])):
+                tokens = tokens[2:] if tokens[0] == "-u" and len(tokens) > 1 else tokens[1:]
+        else:
+            break
     if not tokens:
         return
 
     prog = os.path.basename(tokens[0])
+
+    # Deploy commands declared per repo get a user-facing ask.
+    for pat in delivery().get("deploy_commands", []):
+        try:
+            if re.search(pat, " ".join(tokens)):
+                respond("ask", f"declared deploy command ({pat})")
+        except re.error:
+            log_failure(f"bad deploy_commands pattern: {pat}")
+
+    if prog == "gh":
+        joined = " ".join(tokens)
+        if re.search(r"\bpr\s+merge\b", joined) or re.search(r"\bapi\b.*\bmerges?\b", joined):
+            if gate_fresh() is False:
+                respond("deny", "PR merge while the recorded green-gate hash differs from HEAD — "
+                                "re-run the fast gate first")
+            respond("ask", "merging a PR into a protected branch via gh")
+        return
 
     if prog in ("sh", "bash", "zsh", "dash", "ksh", "python", "python3", "node") :
         for j, t in enumerate(tokens):

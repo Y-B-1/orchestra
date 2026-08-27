@@ -23,4 +23,6 @@ LEDGER: <one line for this ticket's ledger entry>
 MEMORY-CANDIDATES: <traps found, commands that proved things, decisions made — or "none">
 OPEN: <unresolved items — or "none">
 
+Levels: none — builder-max always runs at full strength; a level token on its dispatch is ignored.
+
 Non-negotiable: never spawn sub-agents (enforced by hook; all fan-out belongs to the orchestrator). Finish your brief and report back.
