@@ -22,6 +22,12 @@ out=$(echo '{"command":"env CI=1 git push --force"}' | ./.cursor/hooks/block-dan
 echo "$out" | grep -q '"deny"' || bad "env-prefixed force push not denied: $out"
 out=$(echo '{"command":"gh pr merge 42 --squash"}' | ./.cursor/hooks/block-dangerous.py)
 echo "$out" | grep -Eq '"(ask|deny)"' || bad "gh pr merge not gated: $out"
+out=$(echo '{"command":"az repos pr update --id 42 --status completed"}' | ./.cursor/hooks/block-dangerous.py)
+echo "$out" | grep -Eq '"(ask|deny)"' || bad "az repos pr completion not gated: $out"
+out=$(echo '{"command":"glab mr merge 42"}' | ./.cursor/hooks/block-dangerous.py)
+echo "$out" | grep -Eq '"(ask|deny)"' || bad "glab mr merge not gated: $out"
+out=$(echo '{"command":"az repos pr show --id 42"}' | ./.cursor/hooks/block-dangerous.py)
+echo "$out" | grep -q '"allow"' || bad "read-only az repos command wrongly gated: $out"
 
 say "== 3. Nested-subagent self-test (synthetic payload)"
 rm -f .orchestra/subagent-children.json
@@ -67,7 +73,24 @@ grep -q '^\.cursor/worktrees/' .gitignore || { echo ".cursor/worktrees/" >> .git
 
 say "== 7. Delivery declaration"
 grep -q 'Delivery: <declare' AGENTS.md 2>/dev/null && bad "AGENTS.md Delivery line is still the placeholder — declare the repo's landing rule and deploy policy"
-[ -f .orchestra/delivery.json ] || { mkdir -p .orchestra; printf '{ "protected_branches": ["main"], "landing": "pr", "deploy": { "production": "approval" } }\n' > .orchestra/delivery.json; say "wrote default .orchestra/delivery.json — edit deploy policy per environment"; }
+if [ ! -f .orchestra/delivery.json ]; then
+  mkdir -p .orchestra
+  remote=$(git config --get remote.origin.url 2>/dev/null || echo "")
+  case "$remote" in
+    *github.com*)                      provider=github;       ssg=false ;;
+    *dev.azure.com*|*visualstudio.com*) provider=azure-devops; ssg=true  ;;
+    *gitlab*)                          provider=gitlab;       ssg=false ;;
+    "")                                provider=plain-git;    ssg=false ;;
+    *)                                 provider=plain-git;    ssg=false ;;
+  esac
+  branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)
+  [ "$provider" = plain-git ] && landing=direct || landing=pr
+  printf '{\n  "provider": "%s",\n  "protected_branches": ["%s"],\n  "landing": "%s",\n  "server_side_gate": %s,\n  "deploy": { "production": "approval" },\n  "deploy_commands": []\n}\n' \
+    "$provider" "$branch" "$landing" "$ssg" > .orchestra/delivery.json
+  say "wrote .orchestra/delivery.json — detected provider: $provider (remote: ${remote:-none})"
+  say "  EDIT IT: confirm protected branches, set deploy policy per environment, list deploy_commands"
+  [ "$provider" = azure-devops ] && say "  Azure: server_side_gate=true assumes a branch policy with build validation on '$branch' — create it, or set false"
+fi
 
 say "== 8. Manual steps (cannot be verified here)"
 say "  - Start one background sub-agent in Cursor and note where its state file lands; record that path in .orchestra/state.json as subagent_state_path."

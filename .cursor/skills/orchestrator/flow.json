@@ -29,7 +29,8 @@
     "docs/orchestra/STATE.md": "working memory — orchestrator sole writer; pointers not content; rewritten at wave/batch closes and before deliberate stops; stamped `written-at: <timestamp> @ <git HEAD>`; working-tree file, committed only inside batch-closing commits; 120-line cap is a smoke alarm (over = you are duplicating content that has a home), never an eviction trigger; verbatim quotes only when a ruling fits one line, else pointer only — never a trimmed quote",
     ".orchestra/state.json": "machine run-record (gitignored) — exact keys: gates.last_green_hash (the green commit hash; the hook denies protected pushes while it differs from HEAD), gates.reports{<hash>: report}, redteam{verdicts,rounds,run_ids}, reviews{<ticket>: verdict}, flakes[], subagent_state_path. Written by the orchestrator at the transitions marked here; read by hooks and the janitor.",
     "docs/plans/<feature>-ledger.md": "run state for one plan — always a separate file, never a section in the plan; CLOSED stamp at archive",
-    "docs/AGENT-MEMORY.md": "long-term repo memory — path/topic-tagged entries; janitor drafts, orchestrator commits in the batch-closing commit; update AND prune (git is the history — no append-only markers)"
+    "docs/AGENT-MEMORY.md": "long-term repo memory — path/topic-tagged entries; janitor drafts, orchestrator commits in the batch-closing commit; update AND prune (git is the history — no append-only markers)",
+    ".orchestra/delivery.json": "per-repo delivery declaration (COMMITTED, unlike the rest of .orchestra/): provider (github | azure-devops | gitlab | plain-git), protected_branches, landing (pr | direct), server_side_gate (host enforces the gate itself), deploy policy per environment, deploy_commands patterns the hook asks on. install.sh detects the provider from the remote URL; the orchestrator reads this file before any release action."
   },
   "states": {
     "intake": {
@@ -480,8 +481,8 @@
           "then": "orchestrator writes the memory line itself in the batch-closing commit"
         },
         {
-          "if": "first wave of the feature and the repo lands via PRs",
-          "then": "open a DRAFT PR now — early, cheap, never a blocker; evidence-so-far in the body",
+          "if": "first wave of the feature and the repo lands via PRs/MRs (delivery.landing != 'direct')",
+          "then": "open a DRAFT PR/MR now with the provider's CLI — early, cheap, never a blocker; evidence-so-far in the body",
           "dispatch": "releaser@L1"
         },
         {
@@ -567,24 +568,34 @@
       ]
     },
     "release.merge": {
-      "question": "Can the branch merge such that the gated hash IS the shipped hash?",
+      "question": "Who gates the merge — the host (server_side_gate) or the local hash record — and can the gated hash be the shipped hash?",
       "always": [
-        "Read the repo's delivery declaration (AGENTS.md 'Delivery' line + .orchestra/delivery.json): landing rule, protected branches, deploy policy.",
-        "The hook floor: pushes/merges to protected branches surface a Cursor 'ask' to the real user, and are denied while state.json's gate hash ≠ HEAD — the releaser's NEEDS-APPROVAL block is the audit trail above that floor."
+        "Read the repo's delivery declaration (AGENTS.md 'Delivery' line + .orchestra/delivery.json): provider, protected branches, landing rule, server_side_gate, deploy policy. Use that provider's CLI (github: gh · azure-devops: az repos · gitlab: glab · plain-git: git).",
+        "The hook floor: pushes/merges to protected branches — git, gh, az repos, glab — surface a Cursor 'ask' to the real user, and are denied while gates.last_green_hash ≠ HEAD (relaxed when server_side_gate is true, because the host builds the preview merge commit). That ask IS the merge approval."
       ],
       "routes": [
         {
-          "if": "gate green at HEAD and branch is rebased on current main (fast-forward possible)",
-          "then": "flip the draft PR to ready with the final gate report; merge — fast-gate green is the merge requirement",
+          "if": "server_side_gate true (e.g. Azure DevOps branch policy with build validation)",
+          "then": "make sure the host's required checks match the fast set; mark the PR ready and set auto-complete — the platform gates and merges the preview merge commit, so the gated hash is provably the shipped hash",
           "dispatch": "releaser@L2"
         },
         {
-          "if": "fast-forward impractical",
-          "then": "merge, then auto re-run the fast set at the new main HEAD (mechanical, non-approval); only that green releases a deploy",
-          "dispatch": "releaser@L2 + gatekeeper@L1"
+          "if": "no server-side gate, fast-gate green at HEAD, branch current with the target",
+          "then": "mark the PR ready with the final gate report; merge fast-forward so the gated hash becomes the target HEAD",
+          "dispatch": "releaser@L2"
         },
         {
-          "if": "HEAD moved past the gate record (mechanical check: `git diff --stat <gate-hash>..HEAD -- ':!docs' ':!*.md'` non-empty)",
+          "if": "no server-side gate and the branch is behind the target",
+          "then": "merge the target INTO the feature branch (agent-run rebases are blocked by the guardrail), re-run the fast set, then fast-forward",
+          "dispatch": "releaser@L2 + gatekeeper:fast@L1"
+        },
+        {
+          "if": "fast-forward impractical",
+          "then": "merge, then auto re-run the fast set at the target HEAD (mechanical, non-approval); only that green releases a deploy",
+          "dispatch": "releaser@L2 + gatekeeper:fast@L1"
+        },
+        {
+          "if": "no server-side gate and HEAD moved past the gate record (mechanical check: `git diff --stat <gate-hash>..HEAD -- ':!docs' ':!*.md'` non-empty)",
           "back_to": "gates.fast",
           "carry": "stale-gate: re-run at current HEAD; docs/memory-only commits do NOT void a gate"
         },
@@ -594,7 +605,7 @@
         },
         {
           "if": "merge done, deploy gated (production default, or migrations present)",
-          "then": "releaser stages the deploy and pauses: NEEDS-APPROVAL with exact command + blast radius; spec-axis audit must be green before a production deploy",
+          "then": "releaser stages the deploy and pauses: NEEDS-APPROVAL with exact command + blast radius; spec-axis audit must be green before a production deploy. On Azure DevOps, a Pipelines environment approval check is the natural home for this pause — say so when one exists",
           "dispatch": "releaser@L2",
           "next": "release.deploy"
         },

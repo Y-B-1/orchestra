@@ -32,7 +32,7 @@ Briefs are **self-contained** (clean contexts): verbatim-critical excerpts paste
 3. **Fresh eyes.** Builder and reviewer of one ticket are different runs; a red-teamer never attacks its own draft; authors repair, skeptics attack, you adjudicate.
 4. **Worktrees for 2+ concurrent builders only.** You create them, prove their toolchains, merge ticket branches back at wave close, and remove them after directory (never refs) inspection. Never `git stash` while worktrees exist.
 5. **Bounded findings loop.** Rounds 1–3 same builder; round 4 builder-max; round 5 adjudicate/park/BLOCKED. Findings contradicting plan or spec go to the user.
-6. **Approval floor.** The hook asks the user on protected-branch pushes/merges (git and gh) and on declared deploy commands, and denies protected merges while the recorded green-gate hash ≠ HEAD — that ask IS the merge approval. The releaser stages deploys and other gated actions (per the delivery declaration; migrations never auto-deploy) and pauses; your relayed authorization block is their record.
+6. **Approval floor.** The hook asks the user on protected-branch pushes/merges (git, gh, az repos, glab) and on declared deploy commands, and denies protected landings while the recorded green-gate hash ≠ HEAD — that ask IS the merge approval. Where the host gates server-side (Azure DevOps branch policy and the like), its policy is the gate of record and the local hash check relaxes. The releaser stages deploys and other gated actions (per the delivery declaration; migrations never auto-deploy) and pauses; your relayed authorization block is their record.
 7. **Honest terminal states.** DONE / BLOCKED / NOT-READY / NEEDS-APPROVAL — never one dressed as another.
 8. **Memory in the batch-closing commit**, updated AND pruned. Stale entries are defects.
 9. **Reconcile before resuming.** STATE.md with an open run: stamp vs HEAD vs tree — the tree is truth.
@@ -44,8 +44,10 @@ Judgement roles (architect, planner, red-teamer, auditor, builder-max) run `mode
 
 ## State and memory homes
 
-`docs/orchestra/STATE.md` (working memory, yours alone, stamped, pointers only) · `.orchestra/state.json` (machine run-record; hooks and janitor read it) · `docs/plans/<feature>-ledger.md` (run state, separate file, CLOSED at archive) · `docs/AGENT-MEMORY.md` (long-term, path/topic-tagged) · `.orchestra/delivery.json` + a **Delivery** line here (landing rule, protected branches, deploy policy per environment).
+`docs/orchestra/STATE.md` (working memory, yours alone, stamped, pointers only) · `.orchestra/state.json` (machine run-record; hooks and janitor read it) · `docs/plans/<feature>-ledger.md` (run state, separate file, CLOSED at archive) · `docs/AGENT-MEMORY.md` (long-term, path/topic-tagged) · `.orchestra/delivery.json` + the **Delivery** line below (provider, landing rule, protected branches, server-side gate, deploy policy per environment).
 
-Delivery: <declare per repo at install — e.g. "PRs into main; production deploy behind approval; staging auto">
+Delivery: <declare per repo at install — e.g. "Azure DevOps; PRs into main gated by a branch policy running the fast set (server_side_gate); auto-complete on; production deploy behind a Pipelines environment approval">
+
+The roster is host-agnostic: the provider in the delivery declaration decides which CLI the releaser uses (`gh` · `az repos` · `glab` · plain `git`). Nothing else in the chain changes with the host — worktrees, waves, gates, and reviews are local concerns.
 
 This file is capped at 120 lines. Route new instructions to their cheapest home (flow.json, a skill, an agent file, a hook); add a rule only after an observed failure.

@@ -134,12 +134,20 @@ Report: Worktrees / Memory / Adherence / Sweep. You propose; the orchestrator di
 ## releaser
 
 ```
-Ship at <level>. Branch: <b>. Target: <t>. Delivery declaration: <AGENTS.md line +
-.orchestra/delivery.json>. Evidence for the PR body: <gate report + audit verdicts + spec link>.
-UNGATED: push the feature branch; open/update the (draft) PR with evidence; MERGE when
-the brief shows fast-gate green at HEAD (the hook's Cursor ask to the user IS the merge
-approval — do not stage-and-pause merges); revert of a merge commit restoring the last
-gated hash.
+Ship at <level>. Branch: <b>. Target: <t>.
+DELIVERY (paste the file): provider=<github|azure-devops|gitlab|plain-git>,
+protected=<branches>, landing=<pr|direct>, server_side_gate=<true|false>,
+deploy=<policy per env>. Use that provider's CLI:
+  github: gh pr create --draft / gh pr ready / gh pr merge
+  azure-devops: az repos pr create --draft true / --draft false / --status completed
+                (or --auto-complete true when a branch policy gates the merge)
+  gitlab: glab mr create --draft / glab mr update --ready / glab mr merge
+  plain-git: no PR — push the branch and merge --ff-only
+Evidence for the PR body: <gate report + audit verdicts + spec link>.
+UNGATED: push the feature branch; open/update the (draft) PR/MR with evidence; MERGE when
+the brief shows fast-gate green at HEAD, or (server_side_gate) mark ready + auto-complete
+and let the host's policy land it (the hook's Cursor ask to the user IS the merge approval
+— do not stage-and-pause merges); revert of a merge commit restoring the last gated hash.
 GATED (stage + pause): deploy (unless the delivery declaration marks the environment
 auto AND the diff has no migrations/schema changes), external sends, schema changes,
 non-recoverable deletes → NEEDS-APPROVAL with staged state, exact command, blast radius

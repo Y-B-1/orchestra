@@ -196,13 +196,15 @@
 </table></div>
 <div class="arrow">&darr;</div>
 <div class="state gate"><h3>release.merge &rarr; release.deploy</h3>
-<div class="always">Delivery declaration read (AGENTS.md + .orchestra/delivery.json). Hook floor: protected-branch push/merge (git and gh) asks the real user, and that ask IS the merge approval; denied while gates.last_green_hash &ne; HEAD. Merge done with nothing to deploy &rarr; straight to cleanup.</div>
+<div class="always">Delivery declaration read (AGENTS.md + .orchestra/delivery.json): provider decides the CLI &mdash; <code>gh</code> &middot; <code>az repos</code> &middot; <code>glab</code> &middot; plain <code>git</code>. Hook floor: protected-branch landings on any of them ask the real user, and that ask IS the merge approval; denied while gates.last_green_hash &ne; HEAD. Merge done with nothing to deploy &rarr; straight to cleanup.</div>
 <table>
-<tr><td class="if">gate green at HEAD, branch rebased on main</td><td class="then">flip draft PR to ready with the gate report; merge, fast-forward, so the gated hash IS main's HEAD <span class="role r-releaser">releaser@L2</span></td></tr>
-<tr><td class="if">fast-forward impractical</td><td class="then">merge, then auto re-run the fast set at main HEAD; only that green releases a deploy <span class="role r-gatekeeper">gatekeeper@L1</span></td></tr>
-<tr><td class="if">code commits after the green gate</td><td class="then back">gates.fast at current HEAD</td></tr>
+<tr><td class="if">server_side_gate (Azure DevOps branch policy &amp; co.)</td><td class="then">make the host's required checks mirror the fast set; mark ready + auto-complete &mdash; the platform gates the <b>preview merge commit</b>, so the gated hash is provably the shipped hash <span class="role r-releaser">releaser@L2</span></td></tr>
+<tr><td class="if">no host gate: green at HEAD, branch current</td><td class="then">mark ready with the gate report; merge fast-forward so the gated hash becomes the target HEAD <span class="role r-releaser">releaser@L2</span></td></tr>
+<tr><td class="if">branch behind the target</td><td class="then">merge the target INTO the branch (rebases are guardrail-blocked), re-gate, then fast-forward <span class="role r-gatekeeper">gatekeeper:fast@L1</span></td></tr>
+<tr><td class="if">fast-forward impractical</td><td class="then">merge, then auto re-run the fast set at the target HEAD; only that green releases a deploy <span class="role r-gatekeeper">gatekeeper:fast@L1</span></td></tr>
+<tr><td class="if">code commits after the green gate (no host gate)</td><td class="then back">gates.fast at current HEAD</td></tr>
 <tr><td class="if">deploy policy auto (low-blast env) and NO migrations</td><td class="then">deploy; verify the health check</td></tr>
-<tr><td class="if">production, or migrations present</td><td class="then">stage + NEEDS-APPROVAL (spec-axis audit must be green for production); on your chat approval, execute exactly the staged command <span class="role r-releaser">releaser@L2</span></td></tr>
+<tr><td class="if">production, or migrations present</td><td class="then">stage + NEEDS-APPROVAL (spec-axis audit must be green for production); on your chat approval, execute exactly the staged command. On Azure DevOps a Pipelines environment approval check is the natural home for this pause <span class="role r-releaser">releaser@L2</span></td></tr>
 <tr><td class="if">health check fails / main breaks</td><td class="then">release.rollback: revert the merge first (a proven hash restores auto-executably), diagnose second &rarr; bug lane</td></tr>
 </table></div>
 <div class="arrow">&darr;</div>

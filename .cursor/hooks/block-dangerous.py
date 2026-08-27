@@ -2,8 +2,10 @@
 """Cursor beforeShellExecution hook: the deterministic floor.
 
 Denies destructive commands; asks (Cursor surfaces the approval to the real user)
-on pushes/merges to protected branches; denies protected pushes while the recorded
-green-gate hash differs from HEAD.
+on pushes/merges to protected branches — plain git, gh, az repos, glab — and on
+deploy commands declared in .orchestra/delivery.json; denies protected landings while
+the recorded green-gate hash differs from HEAD, unless the host enforces the gate
+itself (delivery.json "server_side_gate": true).
 
 Honest contract: this is a tripwire against accidents and first-order drift, not a
 wall against adversarial evasion. Fails OPEN on parse surprises so a hook bug cannot
@@ -67,7 +69,14 @@ def current_branch():
 
 
 def gate_fresh():
-    """True when state.json records a green gate at the current HEAD (or check impossible)."""
+    """True when state.json records a green gate at the current HEAD (or check impossible).
+
+    Returns None (no opinion) when the host enforces the gate itself — an Azure DevOps
+    branch policy or equivalent builds the preview merge commit, which is a stronger
+    guarantee than a locally recorded hash.
+    """
+    if delivery().get("server_side_gate"):
+        return None
     try:
         with open(".orchestra/state.json") as f:
             state = json.load(f)
@@ -123,13 +132,23 @@ def check_tokens(tokens):
         except re.error:
             log_failure(f"bad deploy_commands pattern: {pat}")
 
-    if prog == "gh":
+    # Host CLIs that can land code on a protected branch. Provider-agnostic:
+    # GitHub (gh), Azure DevOps (az repos), GitLab (glab).
+    if prog in ("gh", "az", "glab"):
         joined = " ".join(tokens)
-        if re.search(r"\bpr\s+merge\b", joined) or re.search(r"\bapi\b.*\bmerges?\b", joined):
+        lands = (
+            re.search(r"\bpr\s+merge\b", joined)                      # gh pr merge
+            or re.search(r"\bapi\b.*\bmerges?\b", joined)             # gh api …/merges
+            or re.search(r"\bmr\s+merge\b", joined)                   # glab mr merge
+            or (re.search(r"\brepos\s+pr\b", joined)                  # az repos pr …
+                and re.search(r"status\s+completed|--auto-complete\s+true|--complete\s+true", joined))
+        )
+        if lands:
             if gate_fresh() is False:
-                respond("deny", "PR merge while the recorded green-gate hash differs from HEAD — "
-                                "re-run the fast gate first")
-            respond("ask", "merging a PR into a protected branch via gh")
+                respond("deny", "PR/MR completion while the recorded green-gate hash differs from "
+                                "HEAD — re-run the fast gate first (or let the host's branch policy "
+                                "gate the merge and record its result)")
+            respond("ask", f"landing a PR/MR on a protected branch via {prog}")
         return
 
     if prog in ("sh", "bash", "zsh", "dash", "ksh", "python", "python3", "node") :

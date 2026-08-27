@@ -13,6 +13,12 @@ Three sets. The gatekeeper executes and reports (brief: `briefs.md#gatekeeper`);
 | **Re-proof** | reviewer flags implausible evidence | that one ticket's done_when, nothing else |
 | **Full** | ONLY user-triggered (or scheduled, if the user sets that up) | whole codebase, on main, quiet worktree or Cursor cloud agent — never on the critical path, never blocking a PR |
 
+## Where the fast set runs
+
+Locally at every wave close — that is the author's feedback loop, in seconds, with no CI wait. When the host can also run it (`server_side_gate: true` in the delivery declaration — an Azure DevOps branch policy with build validation, GitHub required checks, GitLab approval rules), **the host's check set must mirror this same fast set**, and it becomes the gate of record: it runs against the preview merge commit, so the hash it proves is the hash that ships. Your local run stays useful for speed; the host's run is what merges. Keep the two lists identical — a pipeline that checks less than the fast set silently lowers the bar, and one that checks more turns PRs into blockers, which the delivery policy forbids.
+
+The full set never belongs in a PR's required checks. On Azure DevOps, schedule it as its own pipeline on main; on GitHub, a scheduled workflow.
+
 ## Rules
 
 - **Mechanical widening, not judgment**: a diff touching dependency manifests, build/tsconfig, migrations/schema, shared types/tokens, or auth middleware widens the scoped set. This list lives in your derivation step.
