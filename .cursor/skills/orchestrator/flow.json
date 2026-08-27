@@ -123,6 +123,7 @@
       "routes": [
         { "if": "entry", "then": "dispatch fresh reviewer with ticket + diff + builder's claimed evidence", "dispatch": "reviewer" },
         { "if": "PASS", "then": "ledger: complete with evidence; back to execute.ticket-loop" },
+        { "if": "reviewer flags the builder's evidence as implausible", "then": "dispatch gatekeeper tier 0 (that one ticket's done_when command only) for an honest re-proof before deciding the round", "dispatch": "gatekeeper" },
         { "if": "FINDINGS, rounds 1–3", "then": "resume the SAME builder with findings; re-review", "loop": "execute.review" },
         { "if": "FINDINGS, round 4", "then": "dispatch builder-max (escalation builder, strongest tier) with ticket + full findings history; re-review", "dispatch": "builder-max" },
         { "if": "FINDINGS, round 5", "then": "orchestrator adjudicates: fix inline decision, park in ledger as known issue, or ticket BLOCKED" },
