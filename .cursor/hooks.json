@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      { "command": "./.cursor/hooks/block-dangerous-git.sh", "timeout": 10 }
+    ]
+  }
+}

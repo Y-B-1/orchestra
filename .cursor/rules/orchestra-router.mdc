@@ -1,0 +1,12 @@
+---
+alwaysApply: true
+description: Mandatory Orchestra routing — every task starts at the router
+---
+
+Before responding to any coding task, load the `orchestrator` skill and route via `.cursor/skills/orchestrator/flow.json`. That graph is the normative if/then router: find the matching state, follow its `then`, dispatch the named sub-agent from `.cursor/agents/`. Its `invariants` array applies in every state.
+
+Non-negotiables, active even before the skill loads:
+- No product code for non-trivial work before a design is presented and the user explicitly approves it.
+- Sub-agent briefs are self-contained — paste in every rule, spec excerpt, and verbatim ruling the role needs; sub-agents have clean context and cannot see this rule.
+- Completion claims quote evidence (command + exit code, captured without pipes). Assertions are not evidence.
+- Terminal states are honest: DONE, BLOCKED, NOT-READY, or NEEDS-APPROVAL — never one dressed as another.

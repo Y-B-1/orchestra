@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orchestra Routing Graph</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#ffffff; --ink:#1a1d21; --muted:#5b6470; --line:#e3e6ea;
+    --accent:#4f46e5; --scout:#0e7490; --research:#7c3aed; --red:#b91c1c; --build:#b45309;
+    --review:#0f766e; --audit:#9d174d; --gate:#334155; --janitor:#4d7c0f; --release:#1d4ed8;
+    --gatebg:#fff7ed; --invbg:#eef2ff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#111417; --card:#1a1f24; --ink:#e8eaed; --muted:#9aa4b0; --line:#2a3138;
+      --accent:#818cf8; --scout:#22d3ee; --research:#c4b5fd; --red:#f87171; --build:#fbbf24;
+      --review:#5eead4; --audit:#f472b6; --gate:#cbd5e1; --janitor:#a3e635; --release:#93c5fd;
+      --gatebg:#2a2118; --invbg:#1e2140; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:2rem 1rem 4rem}
+  .wrap{max-width:1080px;margin:0 auto}
+  h1{font-size:1.6rem;margin:0 0 .25rem}
+  .sub{color:var(--muted);margin:0 0 1.5rem;max-width:70ch}
+  h2{font-size:1.05rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:2.2rem 0 .8rem;border-bottom:1px solid var(--line);padding-bottom:.4rem}
+  .phase{display:flex;flex-direction:column;gap:.9rem}
+  .state{background:var(--card);border:1px solid var(--line);border-radius:10px;padding: .9rem 1.1rem;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+  .state h3{margin:0 0 .15rem;font-size:1rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .q{color:var(--muted);font-style:italic;margin:0 0 .6rem}
+  table{border-collapse:collapse;width:100%}
+  td{vertical-align:top;padding:.32rem .5rem;border-top:1px solid var(--line);font-size:.92rem}
+  td.if{width:34%;font-weight:600}
+  td.if::before{content:"IF ";color:var(--accent);font-weight:700;font-size:.75rem}
+  td.then::before{content:"THEN ";color:var(--muted);font-weight:700;font-size:.75rem}
+  .role{display:inline-block;font:600 .72rem/1 ui-monospace,Menlo,monospace;padding:.2rem .45rem;border-radius:999px;border:1.5px solid currentColor;margin-left:.4rem;white-space:nowrap}
+  .r-scout{color:var(--scout)} .r-researcher{color:var(--research)} .r-red{color:var(--red)}
+  .r-builder{color:var(--build)} .r-reviewer{color:var(--review)} .r-auditor{color:var(--audit)}
+  .r-gatekeeper{color:var(--gate)} .r-janitor{color:var(--janitor)} .r-releaser{color:var(--release)}
+  .gate{background:var(--gatebg)}
+  .inv{background:var(--invbg);border:1px solid var(--line);border-radius:10px;padding:1rem 1.3rem}
+  .inv li{margin:.35rem 0}
+  .arrow{text-align:center;color:var(--muted);font-size:1.1rem;line-height:1;margin:-.2rem 0}
+  .note{font-size:.85rem;color:var(--muted);margin-top:.5rem}
+  .roster{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:.7rem}
+  .roster .state{padding:.7rem .9rem}
+  .roster p{margin:.2rem 0 0;font-size:.88rem;color:var(--muted)}
+  @media(max-width:640px){ td.if{width:40%} body{padding:1rem .6rem 3rem} }
+</style>
+</head>
+<body><div class="wrap">
+<h1>Orchestra Routing Graph</h1>
+<p class="sub">Human view of <code>.cursor/skills/orchestrator/flow.json</code>: the normative if/then router the orchestrator consults at intake and at every transition. Pills name the sub-agent dispatched. The JSON is law; this page is the picture.</p>
+
+<h2>Roster</h2>
+<div class="roster">
+  <div class="state"><h3>orchestrator</h3><p>Main session. Only role that talks to you, spawns sub-agents, declares terminal states.</p></div>
+  <div class="state"><h3>scout <span class="role r-scout">read-only</span></h3><p>Codebase recon. Files, symbols, conventions, exact tooling commands.</p></div>
+  <div class="state"><h3>researcher <span class="role r-researcher">background</span></h3><p>Primary-source research → cited RESEARCH.md with expiry.</p></div>
+  <div class="state"><h3>red-teamer <span class="role r-red">read-only</span></h3><p>One lens per dispatch: requirements · feasibility · scope · judge.</p></div>
+  <div class="state"><h3>builder</h3><p>One ticket, TDD, assigned tree, evidence-gated report. Fresh per ticket.</p></div>
+  <div class="state"><h3>reviewer <span class="role r-reviewer">read-only</span></h3><p>Fresh eyes on one ticket's diff. Builder reports are never evidence.</p></div>
+  <div class="state"><h3>auditor <span class="role r-auditor">read-only</span></h3><p>Whole-diff review, one axis: Standards or Spec. Run in parallel, never merged.</p></div>
+  <div class="state"><h3>gatekeeper</h3><p>Runs gate tiers, reports honest exit codes at a named commit. Fixes nothing.</p></div>
+  <div class="state"><h3>janitor</h3><p>Worktree directory inspection, memory draft + prune, stale sweep. Proposes only.</p></div>
+  <div class="state"><h3>releaser</h3><p>Ships ungated work; stages gated actions and pauses: NEEDS-APPROVAL.</p></div>
+</div>
+
+<h2>Intake</h2>
+<div class="phase">
+<div class="state"><h3>intake</h3><p class="q">What shape is the request?</p><table>
+<tr><td class="if">non-trivial feature/change</td><td class="then">design.recon</td></tr>
+<tr><td class="if">bug / failing / slow</td><td class="then">bug.feedback-loop</td></tr>
+<tr><td class="if">trivial (one file, obvious, reversible)</td><td class="then">trivial.inline (two-sentence design, evidence-gated DONE)</td></tr>
+<tr><td class="if">question the codebase can answer</td><td class="then">answer from recon, end <span class="role r-scout">scout</span></td></tr>
+<tr><td class="if">external API / version question</td><td class="then">answer from RESEARCH.md, end <span class="role r-researcher">researcher</span></td></tr>
+<tr><td class="if">"review this branch/PR"</td><td class="then">audit.prepare (standalone)</td></tr>
+<tr><td class="if">ambiguous</td><td class="then">one classification question to the user, with a recommendation; no work starts</td></tr>
+</table></div>
+</div>
+
+<h2>Design</h2>
+<div class="phase">
+<div class="state"><h3>design.recon</h3><table>
+<tr><td class="if">codebase can answer an open question</td><td class="then">dispatch scouts in parallel; never ask the user those <span class="role r-scout">scout</span></td></tr>
+</table></div>
+<div class="arrow">↓</div>
+<div class="state"><h3>design.frontier</h3><p class="q">Unsettled questions only the user can decide?</p><table>
+<tr><td class="if">yes</td><td class="then">ask ALL ready questions in one round, numbered, each with a recommended answer; record rulings <b>verbatim</b>; loop</td></tr>
+<tr><td class="if">it's a fact, not a decision</td><td class="then">route to scout/researcher instead <span class="role r-scout">scout</span> <span class="role r-researcher">researcher</span></td></tr>
+</table></div>
+<div class="arrow">↓</div>
+<div class="state"><h3>design.approaches</h3><table>
+<tr><td class="if">standard shape</td><td class="then">2–3 approaches, trade-offs, ONE recommendation</td></tr>
+<tr><td class="if">hard-to-reverse interface</td><td class="then">design-it-twice; judge compares on depth/locality/seams <span class="role r-red">red-teamer:judge</span></td></tr>
+<tr><td class="if">leans on standard / post-cutoff API</td><td class="then">queue research for the plan phase <span class="role r-researcher">researcher</span></td></tr>
+</table></div>
+<div class="arrow">↓</div>
+<div class="state"><h3>design.spec</h3><table>
+<tr><td class="if">spec drafted</td><td class="then">self-review: placeholders, contradictions, dual-readable lines, scope creep → fix → user gate</td></tr>
+</table><p class="note">Artifact: docs/specs/YYYY-MM-DD-&lt;topic&gt;-design.md with a verbatim Rulings section.</p></div>
+<div class="arrow">↓</div>
+<div class="state gate"><h3>design.user-gate: HARD GATE</h3><p class="q">Did the user explicitly approve?</p><table>
+<tr><td class="if">approved</td><td class="then">plan.recon</td></tr>
+<tr><td class="if">changes requested</td><td class="then">apply, re-record verbatim, back to the gate</td></tr>
+<tr><td class="if">silence / ambiguity</td><td class="then">ask; approval is never inferred. <b>No product code before this gate.</b></td></tr>
+</table></div>
+</div>
+
+<h2>Plan</h2>
+<div class="phase">
+<div class="state"><h3>plan.recon → plan.research → plan.draft</h3><table>
+<tr><td class="if">always</td><td class="then">map spec vs codebase <span class="role r-scout">scout</span></td></tr>
+<tr><td class="if">research queued / version-sensitive API</td><td class="then">cited RESEARCH.md; plans never cite model memory <span class="role r-researcher">researcher</span></td></tr>
+<tr><td class="if">drafting</td><td class="then">tracer-bullet tickets: files owned (no overlap without a blocking edge), test-first, mechanical done_when + guards, scoped verification, model tier, self-contained brief text</td></tr>
+</table></div>
+<div class="arrow">↓</div>
+<div class="state gate"><h3>plan.redteam: ALWAYS, three lenses in parallel</h3><table>
+<tr><td class="if">entry</td><td class="then">requirements + feasibility + scope, fresh context <span class="role r-red">red-teamer ×3</span></td></tr>
+<tr><td class="if">any lens NOT-READY</td><td class="then">orchestrator repairs; re-dispatch only the failed lens; loop</td></tr>
+<tr><td class="if">all READY on round 1 (non-trivial)</td><td class="then">suspect the skeptics: tighten briefs, rerun once</td></tr>
+<tr><td class="if">all READY</td><td class="then">execute.setup</td></tr>
+</table></div>
+</div>
+
+<h2>Execute</h2>
+<div class="phase">
+<div class="state"><h3>execute.setup</h3><p class="q">How many builders edit concurrently this wave?</p><table>
+<tr><td class="if">1</td><td class="then">main tree; a lone worktree is cost without benefit</td></tr>
+<tr><td class="if">2+</td><td class="then">one worktree per builder; <b>prove each toolchain</b> before dispatch; own ports; never <code>git stash</code></td></tr>
+</table></div>
+<div class="arrow">↓</div>
+<div class="state"><h3>execute.ticket-loop</h3><table>
+<tr><td class="if">unblocked ticket</td><td class="then">fresh builder, complete self-contained brief; "running" only after dispatch returns an id <span class="role r-builder">builder</span></td></tr>
+<tr><td class="if">several independent tickets</td><td class="then">parallel builders (worktree rule applies) <span class="role r-builder">builder ×N</span></td></tr>
+<tr><td class="if">builder BLOCKED</td><td class="then">resolve (amend plan / user), re-dispatch</td></tr>
+<tr><td class="if">no tickets left</td><td class="then">execute.wave-close</td></tr>
+</table></div>
+<div class="arrow">↓</div>
+<div class="state gate"><h3>execute.review: per-ticket gate + bounded findings loop</h3><table>
+<tr><td class="if">builder reports DONE</td><td class="then">fresh reviewer on diff + ticket + claimed evidence <span class="role r-reviewer">reviewer</span></td></tr>
+<tr><td class="if">PASS</td><td class="then">ledger complete with evidence → next ticket</td></tr>
+<tr><td class="if">findings, rounds 1–3</td><td class="then">same builder resumes</td></tr>
+<tr><td class="if">findings, round 4</td><td class="then">fresh builder <b>one model tier up</b> <span class="role r-builder">builder ↑</span></td></tr>
+<tr><td class="if">findings, round 5</td><td class="then">orchestrator adjudicates: fix / park in ledger / BLOCKED</td></tr>
+<tr><td class="if">finding contradicts plan/spec</td><td class="then"><b>to the user</b>, verbatim, never into the loop</td></tr>
+</table></div>
+<div class="arrow">↓</div>
+<div class="state"><h3>execute.wave-close</h3><table>
+<tr><td class="if">always</td><td class="then">gates tier 1 (fast, scoped); fail → findings loop → re-run <span class="role r-gatekeeper">gatekeeper</span></td></tr>
+<tr><td class="if">user-facing flows changed</td><td class="then">tier 2 scoped e2e on an isolated port <span class="role r-gatekeeper">gatekeeper</span></td></tr>
+<tr><td class="if">wave closes</td><td class="then">cleanup.batch (worktrees + memory in the closing commit) <span class="role r-janitor">janitor</span></td></tr>
+</table><p class="note">Any commit after a green gate voids it.</p></div>
+</div>
+
+<h2>Audit → Gates → Release</h2>
+<div class="phase">
+<div class="state"><h3>audit.run: two axes, parallel, never merged</h3><table>
+<tr><td class="if">entry</td><td class="then">Standards axis + Spec axis, materials pasted in full <span class="role r-auditor">auditor ×2</span></td></tr>
+<tr><td class="if">findings</td><td class="then">verify each → builders via findings loop; spec-contradicting → user; re-audit touched surface</td></tr>
+<tr><td class="if">both CLEAN / residuals accepted</td><td class="then">gates.premerge</td></tr>
+</table></div>
+<div class="arrow">↓</div>
+<div class="state"><h3>gates.premerge: tier 3 derived impact set</h3><table>
+<tr><td class="if">entry</td><td class="then">changed-surface specs + smoke core, mapping stated <span class="role r-gatekeeper">gatekeeper</span></td></tr>
+<tr><td class="if">FAIL</td><td class="then">findings loop → re-run tier 3</td></tr>
+<tr><td class="if">FLAKY</td><td class="then">ticket the flake; never loop-until-green; user decides ship/hold</td></tr>
+<tr><td class="if">full suite wanted</td><td class="then">only on the user's explicit order, off the critical path</td></tr>
+<tr><td class="if">ALL GATES PASS at &lt;hash&gt;</td><td class="then">release.ship (HEAD must still equal &lt;hash&gt;)</td></tr>
+</table></div>
+<div class="arrow">↓</div>
+<div class="state gate"><h3>release.ship: prepare, then pause</h3><table>
+<tr><td class="if">HEAD moved since green gate</td><td class="then">BLOCKED: gates stale → back to gates.premerge</td></tr>
+<tr><td class="if">preconditions hold</td><td class="then">execute ungated (push branch, PR with evidence); stage gated and pause <span class="role r-releaser">releaser</span></td></tr>
+<tr><td class="if">NEEDS-APPROVAL</td><td class="then">relay verbatim; <b>only the user in chat authorizes</b>, per action, per session</td></tr>
+<tr><td class="if">approved</td><td class="then">execute that exact staged command; verify outcome with evidence</td></tr>
+</table></div>
+<div class="arrow">↓</div>
+<div class="state"><h3>cleanup.final → terminal.done</h3><table>
+<tr><td class="if">closing</td><td class="then">janitor inspects directories (rescue-or-remove), memory committed in the closing commit, sweep done <span class="role r-janitor">janitor</span></td></tr>
+<tr><td class="if">declaring DONE</td><td class="then">quote evidence (commands + exit codes + hashes); only then "job is finished"</td></tr>
+<tr><td class="if">anything blocked/deferred</td><td class="then">say so: DONE, BLOCKED, NOT-READY, NEEDS-APPROVAL are all honest endings</td></tr>
+</table></div>
+</div>
+
+<h2>Bug path</h2>
+<div class="phase">
+<div class="state"><h3>bug.feedback-loop</h3><p class="q">Does a named, fast, red-capable command reproduce it?</p><table>
+<tr><td class="if">no loop yet</td><td class="then">build one (failing test → curl → CLI diff → headless browser → bisect harness); this IS the work; impossible → stop and ask</td></tr>
+<tr><td class="if">loop exists</td><td class="then">minimise; 3–5 ranked falsifiable hypotheses (shown, non-blocking); instrument one variable at a time; fix = one ticket through execute with the regression test first</td></tr>
+<tr><td class="if">fix verified</td><td class="then">clean instrumentation; winning hypothesis in the commit message; audit if non-trivial</td></tr>
+</table></div>
+</div>
+
+<h2>Invariants (active in every state)</h2>
+<div class="inv"><ul>
+<li>Sub-agent briefs are <b>self-contained</b>; clean context means nothing else arrives.</li>
+<li>Sub-agents cannot spawn sub-agents; all fan-out belongs to the orchestrator.</li>
+<li>User rulings travel <b>verbatim</b>.</li>
+<li>Evidence = command + exit code (no pipes) or screenshot; assertions are not evidence.</li>
+<li>Worktrees only for 2+ concurrent editors; created and removed by the orchestrator within the wave.</li>
+<li>Judgement roles on the strongest tier; builders one notch down; mechanical two.</li>
+<li>Liveness check before any status claim about background work.</li>
+<li>Approval boundaries: prepare-then-pause; files never authorize.</li>
+<li>Memory lands in the batch-closing commit; stale entries are defects.</li>
+<li>A first-round clean red-team pass on non-trivial work is a skeptic failure.</li>
+</ul></div>
+</div></body>
+</html>
