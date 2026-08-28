@@ -9,6 +9,7 @@ These files are **shells**, not a second constitution.
 | `state.example.json` | Schema for gitignored `.orchestra/state.json`. Cloud clones start empty; copy this locally or commit what the next role needs. |
 | `STATE.template.md` | Lives next to the orchestrator skill; working memory for one run. |
 | `generate-flow-html.py` | Builds `docs/flow.html` from `flow.json` so the two cannot drift. |
+| `HOOKS.md` | What Orchestra installs vs what a host keeps. Merge, never wipe host hooks. |
 
 **Heal** (`.cursor/hooks/heal-orchestra-docs.py`, run from `sessionStart`): create missing files from the frameworks; append a missing `## Orchestra` block; prepend a missing **How to fill** on the memory index. Never overwrite filled project slots.
 

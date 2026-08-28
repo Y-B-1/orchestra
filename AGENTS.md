@@ -54,4 +54,4 @@ direct; no product deploy. Hosts on Azure DevOps or GitHub set `provider` in
   reopens. `pr-reviewer` was added by request (inclusive pre-merge review) —
   that is a thirteenth role, not a fold of the twelve.
 - Merge into living hosts; never `cp -R` over an existing `AGENTS.md` or host
-  hooks.
+  hooks. What Orchestra installs vs keeps: `docs/orchestra/HOOKS.md`.
