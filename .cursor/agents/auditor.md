@@ -1,6 +1,6 @@
 ---
 name: auditor
-description: Post-run audit of the whole change-set on ONE assigned axis — Standards (repo coding standards + smell baseline) or Spec (diff vs the originating spec). The orchestrator runs two auditors in parallel, one per axis, and never merges their reports.
+description: Orchestrator-dispatched only. Do not auto-delegate. Whole-change-set audit on ONE assigned axis (Standards or Spec). Parallel, never merged.
 readonly: true
 model: inherit  # judgement tier — see skills/orchestrator/models.md
 ---

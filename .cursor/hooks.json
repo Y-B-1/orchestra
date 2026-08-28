@@ -2,10 +2,24 @@
   "version": 1,
   "hooks": {
     "beforeShellExecution": [
-      { "command": "./.cursor/hooks/block-dangerous.py", "timeout": 10 }
+      {
+        "command": "./.cursor/hooks/block-dangerous.py",
+        "timeout": 10,
+        "failClosed": true
+      }
     ],
     "subagentStart": [
-      { "command": "./.cursor/hooks/block-nested-subagents.py", "timeout": 10 }
+      {
+        "command": "./.cursor/hooks/block-nested-subagents.py",
+        "timeout": 10,
+        "failClosed": true
+      }
+    ],
+    "sessionStart": [
+      {
+        "command": "./.cursor/hooks/session-start.py",
+        "timeout": 15
+      }
     ]
   }
 }

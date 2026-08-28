@@ -1,5 +1,5 @@
 {
-  "provider": "plain-git",
+  "provider": "github",
   "protected_branches": ["main"],
   "landing": "direct",
   "server_side_gate": false,

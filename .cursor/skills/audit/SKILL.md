@@ -1,11 +1,14 @@
 ---
 name: audit
-description: Two-axis review of a whole change-set — Standards and Spec auditors in parallel, never merged. Triggers: 2+ ticket batches, the user's ask, or standalone "review this branch/PR". Spec axis is a precondition for production deploys and for DONE. Routing: flow.json audit.* states.
+description: Main session only. Workers never load this. Two-axis review of a whole change-set — Standards and Spec auditors in parallel, never merged. Routing: flow.json audit.* states.
+disable-model-invocation: true
 ---
 
 # Audit
 
 Two fresh auditors in parallel, one axis each (brief: `briefs.md#auditor`). Not every run needs it: a single-ticket run's reviewer already saw the whole diff — audit adds value only when no single reviewer did, when the user asks, or as a standalone review.
+
+**Boundary.** The **auditor** is the two-axis check (Standards vs Spec, reports never merged). The **pr-reviewer** (`review.pr`, after the fast gate) is the inclusive whole-PR / whole-branch artifact — walkthrough, severities, merge recommendation. pr-reviewer does not replace this two-axis audit; the auditor does not replace the inclusive PR review. Single-ticket runs still skip this audit (`audit.decide` → `release.merge`) after `review.pr` is CLEAN.
 
 ## Preparation (yours)
 

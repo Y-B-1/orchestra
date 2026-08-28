@@ -19,6 +19,7 @@
     "builder": ".cursor/agents/builder.md",
     "builder-max": ".cursor/agents/builder-max.md",
     "reviewer": ".cursor/agents/reviewer.md",
+    "pr-reviewer": ".cursor/agents/pr-reviewer.md",
     "auditor": ".cursor/agents/auditor.md",
     "gatekeeper": ".cursor/agents/gatekeeper.md",
     "janitor": ".cursor/agents/janitor.md",
@@ -27,48 +28,41 @@
   "levels": "Dispatch tokens carry @L1 (minimal) / @L2 (standard, default) / @L3 (deep). Each agent file defines what its levels mean — the level contract travels in the brief. Which roles fire in which state, and at what level, IS the activation model; there is no separate matrix.",
   "state_files": {
     "docs/orchestra/STATE.md": "working memory — orchestrator sole writer; pointers not content; rewritten at wave/batch closes and before deliberate stops; stamped `written-at: <timestamp> @ <git HEAD>`; working-tree file, committed only inside batch-closing commits; 120-line cap is a smoke alarm (over = you are duplicating content that has a home), never an eviction trigger; verbatim quotes only when a ruling fits one line, else pointer only — never a trimmed quote",
-    ".orchestra/state.json": "machine run-record (gitignored) — exact keys: gates.last_green_hash (the green commit hash; the hook denies protected pushes while it differs from HEAD), gates.reports{<hash>: report}, redteam{verdicts,rounds,run_ids}, reviews{<ticket>: verdict}, flakes[], subagent_state_path. Written by the orchestrator at the transitions marked here; read by hooks and the janitor.",
+    ".orchestra/state.json": "machine run-record (gitignored) — exact keys: gates.last_green_hash (the green commit hash; the hook denies protected pushes while it differs from HEAD), gates.reports{<hash>: report}, redteam{verdicts,rounds,run_ids}, reviews{<ticket>: verdict, pr: CLEAN|BLOCKED}, flakes[], subagent_state_path. Written by the orchestrator at the transitions marked here; read by hooks and the janitor.",
     "docs/plans/<feature>-ledger.md": "run state for one plan — always a separate file, never a section in the plan; CLOSED stamp at archive",
-    "docs/AGENT-MEMORY.md": "long-term repo memory — path/topic-tagged entries; janitor drafts, orchestrator commits in the batch-closing commit; update AND prune (git is the history — no append-only markers)",
-    ".orchestra/delivery.json": "per-repo delivery declaration (COMMITTED, unlike the rest of .orchestra/): provider (github | azure-devops | gitlab | plain-git), protected_branches, landing (pr | direct), server_side_gate (host enforces the gate itself), deploy policy per environment, deploy_commands patterns the hook asks on. install.sh detects the provider from the remote URL; the orchestrator reads this file before any release action."
+    "docs/AGENT-MEMORY.md": "long-term repo memory — fill-in index (how-to-fill + Current); janitor drafts and prunes, orchestrator commits in the batch-closing commit; git is the history — no append-only markers",
+    ".orchestra/delivery.json": "per-repo delivery declaration (COMMITTED, unlike gitignored .orchestra/ files): provider (github | azure-devops | gitlab | plain-git), protected_branches, landing (pr | direct), server_side_gate (host enforces the gate itself), deploy policy per environment, deploy_commands patterns the hook asks on. install.sh detects the provider from the remote URL; the orchestrator reads this file before any release action.",
+    ".orchestra/package-version": "install stamp (COMMITTED via gitignore exception): copy of repo-root VERSION plus git describe. Written by install.sh so a host can see which orchestra package it merged."
   },
   "states": {
     "intake": {
       "question": "What shape is the request, and is there an open run to resume?",
-      "match": "all",
+      "match": "first",
       "routes": [
         {
           "if": "docs/orchestra/STATE.md exists with an OPEN run",
-          "then": "reconcile BEFORE acting: compare its stamp to `git rev-parse HEAD`, `git status --porcelain`, `git worktree list`; on mismatch the TREE is truth — repair STATE.md first, then enter at its recorded state"
+          "then": "reconcile BEFORE acting: compare its stamp to `git rev-parse HEAD`, `git status --porcelain`, `git worktree list`; on mismatch the TREE is truth — repair STATE.md first, then enter at its recorded state (do not also classify into another lane this turn)"
+        },
+        {
+          "if": "the user asks for an unattended/continuous run ('keep going until done', 'run this overnight') AND a ledger exists (docs/plans/<feature>-ledger.md or STATE.md ledger pointer)",
+          "then": "confirm the caps and the stop rules with the user, then enter the autonomy loop",
+          "next": "autonomy.loop"
+        },
+        {
+          "if": "the user asks for an unattended/continuous run but no ledger exists",
+          "then": "NOT-READY: autonomy only advances an existing ledger. Classify the work into a lane and plan first; do not enter autonomy.loop"
         },
         {
           "if": "full-suite request ('run the full e2e', scheduled trigger)",
           "next": "fullsuite.run"
         },
         {
-          "if": "the user asks for an unattended/continuous run ('keep going until done', 'run this overnight')",
-          "then": "confirm the caps and the stop rules with the user, then enter the autonomy loop",
-          "next": "autonomy.loop"
-        },
-        {
-          "if": "non-trivial feature/change: multi-wave, multi-subsystem, a migration, or hard to reverse",
-          "next": "design.recon"
-        },
-        {
-          "if": "small standard change: roughly 2–5 files, no migration, reversible",
-          "next": "small.design"
-        },
-        {
-          "if": "trivial: one file, obvious, reversible",
-          "next": "trivial.inline"
+          "if": "'review this branch/PR'",
+          "next": "audit.run"
         },
         {
           "if": "bug, failing test, regression, 'it's slow'",
           "next": "bug.feedback-loop"
-        },
-        {
-          "if": "'review this branch/PR'",
-          "next": "audit.run"
         },
         {
           "if": "question the codebase can answer",
@@ -77,8 +71,20 @@
         },
         {
           "if": "external API / version question",
-          "then": "answer from a primary-source check, END",
+          "then": "answer from a primary-source check, END — orchestrator chooses foreground vs background; researcher is not always-background",
           "dispatch": "researcher@L1"
+        },
+        {
+          "if": "trivial: one file, obvious, reversible",
+          "next": "trivial.inline"
+        },
+        {
+          "if": "small standard change: roughly 2–5 files, no migration, reversible",
+          "next": "small.design"
+        },
+        {
+          "if": "non-trivial feature/change: multi-wave, multi-subsystem, a migration, or hard to reverse",
+          "next": "design.recon"
         },
         {
           "if": "ambiguous between lanes",
@@ -169,13 +175,13 @@
         },
         {
           "if": "gate green and the repo lands via PRs",
-          "then": "open the PR with evidence (ungated)",
+          "then": "open the PR with evidence if one is not already open (ungated)",
           "dispatch": "releaser@L1",
-          "next": "release.merge"
+          "next": "review.pr"
         },
         {
           "if": "gate green, no PR flow",
-          "next": "terminal.done"
+          "next": "review.pr"
         },
         {
           "if": "gate FAIL",
@@ -248,7 +254,7 @@
         },
         {
           "if": "design leans on an industry standard or post-cutoff API",
-          "then": "queue researcher (background) for the plan phase",
+          "then": "queue researcher for the plan phase (orchestrator chooses background; the agent file is not always-background)",
           "dispatch": "researcher@L2"
         },
         {
@@ -375,7 +381,8 @@
       "question": "How many builders edit concurrently, and do they share a filesystem?",
       "always": [
         "Ledger file (docs/plans/<feature>-ledger.md) exists before the first dispatch.",
-        "Never git stash while worktrees exist."
+        "Never git stash while worktrees exist.",
+        "Maximize parallelism without mixing work: dispatch every unblocked ticket in the current wave whose files do not overlap, in one message. Serial only on a blocking edge, shared file ownership, or a failed worktree proof. You hire N builders; a builder never hires another builder."
       ],
       "routes": [
         {
@@ -385,7 +392,7 @@
         },
         {
           "if": "2+ builders sharing one checkout (local session, or sub-agents inside ONE cloud VM)",
-          "then": "one worktree per builder (git worktree add <repo>/.cursor/worktrees/<ticket> -b <ticket-branch>; check you are not already inside one; .cursor/worktrees/ gitignored); install dependencies and PROVE each toolchain before dispatch; own ports per tree",
+          "then": "one worktree per builder (git worktree add <repo>/.cursor/worktrees/<ticket> -b <ticket-branch>; check you are not already inside one; .cursor/worktrees/ gitignored); install dependencies and PROVE each toolchain before dispatch; own ports per tree. Cursor 3.5+ may delete unmanaged worktree dirs (~/.cursor/worktrees/, cursor.worktreeMaxCount); named-branch commits are the preservation. Ledger git_branch from subagentStart (nest hook records it). Janitor inspects git worktree list, not only .cursor/worktrees/<ticket>.",
           "next": "execute.ticket-loop"
         },
         {
@@ -405,7 +412,7 @@
       "routes": [
         {
           "if": "yes (several independent → parallel, worktree rule applies)",
-          "then": "fresh builder per ticket with its complete self-contained brief; ledger 'running' only after dispatch returns an id",
+          "then": "orchestrator hires one fresh builder per ticket in this wave, all in one message, each with its complete self-contained brief; ledger 'running' only after dispatch returns an id. Builders do not spawn builders.",
           "dispatch": "builder@L2",
           "next": "execute.review"
         },
@@ -544,6 +551,43 @@
         },
         {
           "if": "green and the feature is complete",
+          "next": "review.pr"
+        }
+      ]
+    },
+    "review.pr": {
+      "question": "Does the inclusive whole-PR (or whole-branch) review pass — no Critical or Major — before merge?",
+      "always": [
+        "Pin the merge-base or the open PR diff. Small diffs pasted; large diffs passed as the pinned command + file list. Runs on PR-landing and on direct-landing (branch diff) alike — hosted Bugbot/Copilot/CodeRabbit on a remote PR are extra, not a substitute.",
+        "Record the verdict (CLEAN or BLOCKED + worst severity) in the ledger and .orchestra/state.json. Nits/Trivial never block merge. This does not replace the gatekeeper or the per-ticket reviewer."
+      ],
+      "match": "first",
+      "routes": [
+        {
+          "if": "entry",
+          "then": "dispatch one pr-reviewer on the whole change about to merge",
+          "dispatch": "pr-reviewer@L2"
+        },
+        {
+          "if": "BLOCKED (Critical or Major) and the run is the small lane",
+          "back_to": "small.build",
+          "carry": "the ranked Critical/Major findings as a findings round"
+        },
+        {
+          "if": "BLOCKED (Critical or Major)",
+          "back_to": "execute.ticket-loop",
+          "carry": "the ranked Critical/Major findings as a findings round to a lone builder in the main tree"
+        },
+        {
+          "if": "CLEAN or nits-only and the run is the small lane and the repo lands via PRs",
+          "next": "release.merge"
+        },
+        {
+          "if": "CLEAN or nits-only and the run is the small lane",
+          "next": "terminal.done"
+        },
+        {
+          "if": "CLEAN or nits-only",
           "next": "audit.decide"
         }
       ]
@@ -595,8 +639,8 @@
     "release.merge": {
       "question": "Who gates the merge — the host (server_side_gate) or the local hash record — and can the gated hash be the shipped hash?",
       "always": [
-        "Read the repo's delivery declaration (AGENTS.md 'Delivery' line + .orchestra/delivery.json): provider, protected branches, landing rule, server_side_gate, deploy policy. Use that provider's CLI (github: gh · azure-devops: az repos · gitlab: glab · plain-git: git).",
-        "The hook floor: pushes/merges to protected branches — git, gh, az repos, glab — surface a Cursor 'ask' to the real user, and are denied while gates.last_green_hash ≠ HEAD (relaxed when server_side_gate is true, because the host builds the preview merge commit). That ask IS the merge approval."
+        "Read the repo's delivery declaration (AGENTS.md 'Delivery' slot + .orchestra/delivery.json): provider, protected branches, landing rule, server_side_gate, deploy policy. Use that provider's CLI (github: gh · azure-devops: az repos · gitlab: glab · plain-git: git). server_side_gate is true only when a host branch policy actually runs the fast set — do not infer it from an Azure remote URL alone.",
+        "Hook floor: force-push/stash/rebase/hard-reset are deny. Protected-branch landings and declared deploys ask in a local IDE; ask degrades to deny when headless. Ask is not the merge approval of record — the host branch policy is, when server_side_gate is true; otherwise the local hash check denies protected landings while gates.last_green_hash ≠ HEAD."
       ],
       "routes": [
         {
@@ -645,7 +689,7 @@
       "routes": [
         {
           "if": "gated and the user approves in chat",
-          "then": "re-dispatch the releaser with the authorization block (USER APPROVED IN CHAT verbatim + EXECUTE EXACTLY); the hook's ask is the floor, the block is the record",
+          "then": "re-dispatch the releaser with the authorization block (USER APPROVED IN CHAT verbatim + EXECUTE EXACTLY); hook ask is a local-IDE tripwire, not the approval of record",
           "dispatch": "releaser@L2"
         },
         {
@@ -750,11 +794,16 @@
     "autonomy.loop": {
       "question": "Unattended mode: is there an unfinished ledger item and budget left?",
       "always": [
+        "A ledger file (docs/plans/<feature>-ledger.md, or the path STATE.md points at) must exist; otherwise NOT-READY — autonomy cannot start without a plan.",
         "Never invent work: the loop only advances items already in the plan's ledger. New scope stops the loop and goes to the user.",
         "Each pass is a fresh dispatch through the normal chain (execute.ticket-loop → execute.review → gates.fast); autonomy changes WHO decides to continue, never WHAT the roles do.",
         "A ledger item flips to done only on evidence (command + exit code). Flipping without evidence is the one tamper rule."
       ],
       "routes": [
+        {
+          "if": "no ledger file exists",
+          "then": "NOT-READY — leave this state; autonomy cannot start without a plan"
+        },
         {
           "if": "entry",
           "then": "record the caps the user set: max passes, max consecutive no-progress passes (default 2), token/time budget, and the approval boundaries that halt the loop"
@@ -782,7 +831,7 @@
         },
         {
           "if": "every ledger item is done",
-          "next": "audit.decide"
+          "next": "review.pr"
         }
       ]
     }
@@ -802,12 +851,12 @@
   },
   "invariants": [
     "Sub-agent briefs are self-contained: verbatim-critical excerpts (rulings, done_when, path rules) pasted; bulk material passed as pointers the agent reads itself.",
-    "Sub-agents never spawn sub-agents (policy; subagentStart hook denies it). All fan-out is the orchestrator's.",
+    "Sub-agents never spawn sub-agents, including more of their own role (policy; subagentStart hook denies it). All fan-out is the orchestrator's: N concurrent instances of one role per wave, as the plan names.",
     "User rulings travel verbatim — full quote only when it fits one line, else pointer; never a trimmed quote.",
     "Evidence = command + exit code (captured without pipes) or both-theme screenshots; assertions are not evidence.",
     "Worktrees only for 2+ concurrent editors; created, integrated, and removed by the orchestrator within the wave.",
-    "Judgement roles (architect, planner, red-teamer, auditor, builder-max) run model: inherit — the ceiling; the rest are pinned lower at install (install.sh verifies).",
-    "Approval boundaries: prepare-then-pause; the hook's protected-branch 'ask' is the deterministic floor; files never authorize.",
+    "Judgement roles (architect, planner, red-teamer, auditor, builder-max, pr-reviewer) run model: inherit — the ceiling; the rest are pinned lower at install (install.sh verifies).",
+    "Approval boundaries: destructive git is deny; protected landings ask locally and deny when headless; host branch policy is the merge gate of record when server_side_gate is true; files never authorize.",
     "Memory lands in the batch-closing commit; stale entries are pruned, not superseded-in-place.",
     "Honest terminal states — DONE, BLOCKED, NOT-READY, NEEDS-APPROVAL; never one dressed as another.",
     "Every transition announced: `flow: <from> -> <to> (<matched if>)`."
@@ -817,7 +866,7 @@
     "worktrees": "Topology A: sub-agents share the VM's single clone and single git index, so the local rule applies unchanged — 2+ concurrent builders get worktrees inside the VM. Topology B: each VM is already an isolated clone; no worktrees.",
     "handoff": "Topology A: briefs + shared disk, as local. Topology B: nothing but git (pushed branches) and the orchestrator relaying report text — anything load-bearing must be committed, because gitignored files do not exist in a fresh clone.",
     "conversation": "A cloud orchestrator cannot hold a live conversation; it reaches the user asynchronously (Slack, web, PR comments). Design and plan are conversations — run them locally. Execute waves are the natural cloud workload.",
-    "enforcement": "In cloud, `ask` is undefined behavior (cloud agents auto-run commands), so the hook degrades ask -> DENY when headless. .orchestra/state.json is gitignored and therefore absent from a fresh clone: a protected landing with no readable gate record is DENIED in cloud. The correct cloud answer is server_side_gate — let the host's branch policy be the gate of record. Hooks also do not run during a cloud agent's early read-only turns.",
+    "enforcement": "In cloud, `ask` is undefined behavior (cloud agents auto-run commands), so the hook degrades ask -> DENY when headless. .orchestra/state.json is gitignored and therefore absent from a fresh clone: a protected landing with no readable gate record is DENIED in cloud. The correct cloud answer is server_side_gate — set it only when a host branch policy actually runs the fast set; do not default it true for every Azure remote. Host-mediated landings stay allowed; direct pushes to protected branches never do. Hooks also do not run during a cloud agent's early read-only turns. Seed state.json from docs/orchestra/state.example.json when missing.",
     "config": "Repo-level config travels with the clone (.cursor/agents, .cursor/skills, .cursor/hooks.json, AGENTS.md). User-level config (~/.cursor/*) does NOT. Keep this package project-scoped."
   }
 }

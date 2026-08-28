@@ -1,6 +1,7 @@
 ---
 name: execute
-description: Work the ticketed plan — fresh builder and fresh reviewer per ticket, bounded findings loop, worktrees for concurrent waves, orchestrator-owned integration, wave close in the fixed order. Routing: flow.json execute.* states.
+description: Main session only. Workers never load this. Work the ticketed plan — fresh builder and reviewer per ticket, findings loop, worktrees, integration. Routing: flow.json execute.* states.
+disable-model-invocation: true
 ---
 
 # Execute
@@ -10,7 +11,8 @@ You coordinate and talk to the user; builders build; reviewers review. Briefs co
 ## Setup
 
 1. Feature branch + the ledger file `docs/plans/<feature>-ledger.md` (always separate) before the first dispatch. Read repo memory; carry only what the wave needs.
-2. **Worktrees for 2+ builders sharing one checkout** — a local session, or sub-agents inside a single cloud VM (one shared tree = one shared git index). Builders that are each their own cloud agent skip this entirely: the VM is the isolation, each pushes its own branch, and integration means fetching those branches. The rule: `git worktree add <repo>/.cursor/worktrees/<ticket> -b <ticket-branch>`. First check you are not already inside one (`git rev-parse --git-dir` ≠ `--git-common-dir`), and keep `.cursor/worktrees/` gitignored. Install dependencies and **prove each toolchain** (run the real test runner once — install output lies) before dispatching; a proof that survives one repair attempt broken collapses the wave to sequential in the main tree. Own ports per tree. Cursor's native per-agent worktrees isolate too, but Cursor may clean them itself — commits on named ticket branches are the only preservation. Never `git stash` while worktrees exist.
+2. **Hire the wave, not a sequence.** The plan's current wave is the set of tickets you dispatch together: one fresh builder per ticket, all in one message. A builder implements one ticket and never launches another builder. Serial only when a blocking edge, shared file ownership, or a failed worktree proof says so. Do not serialize independent work.
+3. **Worktrees for 2+ builders sharing one checkout** — a local session, or sub-agents inside a single cloud VM (one shared tree = one shared git index). Builders that are each their own cloud agent skip this entirely: the VM is the isolation, each pushes its own branch, and integration means fetching those branches. The rule: `git worktree add <repo>/.cursor/worktrees/<ticket> -b <ticket-branch>`. First check you are not already inside one (`git rev-parse --git-dir` ≠ `--git-common-dir`), and keep `.cursor/worktrees/` gitignored. Install dependencies and **prove each toolchain** (run the real test runner once — install output lies) before dispatching; a proof that survives one repair attempt broken collapses the wave to sequential in the main tree. Own ports per tree. Cursor 3.5+ may delete unmanaged worktree dirs (`~/.cursor/worktrees/`, `cursor.worktreeMaxCount`); commits on named ticket branches are the only preservation. The nest hook records `git_branch` from `subagentStart` — janitor inspects `git worktree list` plus that ledger, not only `.cursor/worktrees/<ticket>`. Never `git stash` while worktrees exist.
 
 ## Per ticket
 
@@ -20,7 +22,7 @@ Dispatch → review → findings loop, per flow.json execute.review: rounds 1–
 
 1. **Integrate**: merge each reviewed ticket branch into the feature branch yourself, ordered by blocking edges. Conflicts are expected; resolve by preserving both tickets' intent — never `--abort`, never invented behavior; too-entangled conflicts go to a fresh builder with both tickets pasted.
 2. **Close the batch**: janitor (worktrees exist or 2+ tickets — brief pastes the ledger excerpt) or your own memory line (tiny batches); rescue-or-remove worktrees; memory draft lands **in this batch-closing commit**. Rewrite `STATE.md` (stamped). First wave of a PR-landing repo: releaser opens the **draft PR** now.
-3. **Gate**: the fast set at the post-merge, post-memory HEAD — the hash that ships. Failures fix forward (lone builder, main tree) and re-run without repeating step 1–2's always-batch.
+3. **Gate**: the fast set at the post-merge, post-memory HEAD — the hash that ships. Failures fix forward (lone builder, main tree) and re-run without repeating step 1–2's always-batch. When the feature is complete, `gates.fast` routes to `review.pr` (inclusive PR/branch review) before audit or merge.
 
 ## Interrupts and dead builders
 

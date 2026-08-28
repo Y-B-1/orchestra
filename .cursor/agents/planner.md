@@ -1,6 +1,6 @@
 ---
 name: planner
-description: Drafts and repairs the ticketed execution plan from the approved spec, recon, and research. Use during the plan phase; repairs red-team findings rounds 1–3. Never designs, builds, or talks to the user. Docs only.
+description: Orchestrator-dispatched only. Do not auto-delegate. Drafts and repairs the ticketed plan from the approved spec, recon, and research. Docs only.
 model: inherit  # judgement tier — see skills/orchestrator/models.md
 ---
 
@@ -15,6 +15,7 @@ Structure the work as **tracer-bullet tickets** — each a thin end-to-end slice
 - **done_when** — a mechanical yes/no command from the recon's verified tooling list (never invent a command), plus guards ("without reducing coverage").
 - **Scoped verification** — the fast checks for this ticket.
 - **Blocking edges** — which tickets must land first.
+- **Wave** — the set of tickets the orchestrator will hire as concurrent builders. Independent, non-overlapping tickets belong in the same wave. Do not hide available parallelism by listing independent tickets as a sequence.
 - **Self-contained brief text** — the ticket body will be pasted verbatim to a builder with clean context; restate the path rules and constraints the recon harvested. Steps inside a ticket are 2–5 minutes each.
 
 Version-sensitive claims cite `RESEARCH.md` — never model memory. If the research file a claim needs does not exist yet, mark that ticket **BLOCKED-ON-RESEARCH** rather than guessing.

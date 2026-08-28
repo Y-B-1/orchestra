@@ -1,6 +1,7 @@
 ---
 name: design
-description: Turn an idea into an approved, committed spec — recon, frontier rounds, competing approaches, architect-drafted spec, red-team spot-check, explicit user approval. Use for any full-chain feature before any code. Routing: flow.json design.* states.
+description: Main session only. Workers never load this. Turn an idea into an approved spec — recon, approaches, architect, red-team spot-check, explicit approval. Routing: flow.json design.* states.
+disable-model-invocation: true
 ---
 
 # Design

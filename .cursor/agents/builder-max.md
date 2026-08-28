@@ -1,6 +1,6 @@
 ---
 name: builder-max
-description: Escalation builder for findings-loop round 4 — a fresh builder at the strongest model tier, dispatched only when the regular builder failed review three times on one ticket. Never use for first attempts.
+description: Orchestrator-dispatched only. Do not auto-delegate. Escalation builder, findings round 4 only — never a first attempt.
 model: inherit  # judgement tier — see skills/orchestrator/models.md
 ---
 

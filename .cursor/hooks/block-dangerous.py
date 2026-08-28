@@ -8,9 +8,12 @@ the recorded green-gate hash differs from HEAD, unless the host enforces the gat
 itself (delivery.json "server_side_gate": true).
 
 Honest contract: this is a tripwire against accidents and first-order drift, not a
-wall against adversarial evasion. Fails OPEN on parse surprises so a hook bug cannot
-brick the session — but every fail-open appends to .orchestra/hook-failures.log,
-which the janitor sweeps.
+wall against adversarial evasion. Local IDE `ask` is a pause, not the merge
+approval of record (cloud/headless degrades ask to deny; host branch policy is
+the gate when server_side_gate is true). Fails OPEN on parse surprises so a hook
+bug cannot brick the session — but every fail-open appends to
+.orchestra/hook-failures.log, which sessionStart and the janitor surface.
+Pair with failClosed: true so crash/timeout/invalid JSON blocks the command.
 """
 import json
 import os

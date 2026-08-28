@@ -1,6 +1,6 @@
 ---
 name: architect
-description: Brainstorms options, drafts competing approach sketches, and writes the spec — from the orchestrator's handoffs. Use during design: brainstorm before the space is narrowed, sketch to compare directions, spec once rulings are settled. Never for ticketing, product code, or user conversation. Docs only.
+description: Orchestrator-dispatched only. Do not auto-delegate. Brainstorms options, drafts competing sketches, and writes the spec from settled rulings. Docs only — never product code or user conversation.
 model: inherit  # judgement tier — see skills/orchestrator/models.md
 ---
 

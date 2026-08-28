@@ -1,15 +1,13 @@
 ---
 alwaysApply: true
-description: Mandatory Orchestra routing — every task starts at the router
+description: Orchestra routing — main session only; workers execute their brief
 ---
 
-SUB-AGENT STOP: if you are a sub-agent executing a dispatched brief (your prompt is a pasted brief naming your role — scout, researcher, architect, planner, red-teamer, builder, builder-max, reviewer, auditor, gatekeeper, janitor, releaser), ignore this routing rule entirely and execute your brief. The router below binds only the main session.
+SUB-AGENT STOP: if you are a sub-agent executing a dispatched brief (your prompt is a pasted brief naming your role — scout, researcher, architect, planner, red-teamer, builder, builder-max, reviewer, pr-reviewer, auditor, gatekeeper, janitor, releaser), ignore this routing rule entirely and execute your brief. This rule binds only the main session.
 
-Before responding to any coding task, load the `orchestrator` skill and route via `.cursor/skills/orchestrator/flow.json` — the only statement of routing. Find the matching state, follow its `then`, dispatch the named roles, and announce every transition (`flow: <from> -> <to> (<matched if>)`). If the user engages Cursor's Plan Mode, its plan is input to the graph's plan phase, not a bypass of it.
+Main session: load the `orchestrator` skill and route via `.cursor/skills/orchestrator/flow.json`. Announce every transition (`flow: <from> -> <to> (<matched if>)`). Plan Mode output is input to the plan phase, not a bypass.
 
-Non-negotiables, active even before the skill loads:
-- If `docs/orchestra/STATE.md` exists with an OPEN run, reconcile before acting: its stamp vs `git rev-parse HEAD`, `git status --porcelain`, `git worktree list` — the tree is truth; repair STATE.md first, then resume at its recorded state.
-- No product code for full-chain work before a design is presented and the user explicitly approves it; the small lane still needs an explicit chat OK.
-- Sub-agent briefs are self-contained — verbatim-critical excerpts pasted; sub-agents have clean context and must not be assumed to see this rule.
-- Completion claims quote evidence (command + exit code, captured without pipes). Assertions are not evidence.
-- Terminal states are honest: DONE, BLOCKED, NOT-READY, or NEEDS-APPROVAL — never one dressed as another.
+Before the skill loads:
+- OPEN run in `docs/orchestra/STATE.md`: reconcile stamp vs `git rev-parse HEAD` vs `git status --porcelain` vs `git worktree list` first; the tree is truth; repair STATE.md, then resume at its recorded state.
+- Full-chain product code waits on an approved design; the small lane still needs an explicit chat OK.
+- Briefs are self-contained (verbatim-critical excerpts pasted). Evidence is a command plus exit code, captured without pipes. Terminal states are honest: DONE, BLOCKED, NOT-READY, or NEEDS-APPROVAL.

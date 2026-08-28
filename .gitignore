@@ -1,3 +1,6 @@
 .orchestra/*
 !.orchestra/delivery.json
+!.orchestra/package-version
 .cursor/worktrees/
+__pycache__/
+*.py[cod]

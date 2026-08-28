@@ -94,6 +94,20 @@ orders a gatekeeper re-proof); ownership; surgery; style. No fixes. Placeholder 
 are defects. Contradicts plan → "ESCALATE". PASS or FINDINGS ranked. Trailer at end.
 ```
 
+## pr-reviewer
+
+```
+Inclusive review of the WHOLE change about to merge (PR diff or git diff <base>...HEAD).
+You did not write it. You are not the per-ticket reviewer and not the two-axis auditor.
+LANE: <small | full-chain>. LEVEL: <L1|L2|L3>.
+--- DIFF --- <paste if small; else: run `git diff <fp>...HEAD` + file list, read-only>
+--- GATE --- fast set green at <hash> (do not re-run; flag implausible evidence)
+Walkthrough in dependency order. Severity: Critical / Major / Minor / Trivial.
+Categories: security, correctness, tests, performance (only if the diff touches it),
+maintainability. Cite file + hunk/symbol. No fixes. Trivial/nits never block.
+Verdict: CLEAN (no Critical/Major) or BLOCKED. List nits separately. Trailer at end.
+```
+
 ## auditor (one axis per dispatch)
 
 ```
@@ -123,14 +137,22 @@ BLOCKED: <gate>. Trailer at end.
 Batch closing: <id> at <level>. Inspect and report; execute nothing destructive.
 LEDGER EXCERPT (your only context; paste in full): <per ticket: built, decisions, traps,
 proving commands, parked findings>
-1. WORKTREES: per path, check the DIRECTORY (`git -C <p> status --porcelain`), never the
-   refs. Dirty → RESCUE NEEDED + exact commands (named branch, never detached HEAD, never
-   stash). Clean+merged → SAFE TO REMOVE + command.
-2. MEMORY: draft docs/AGENT-MEMORY.md update from the excerpt (path/topic-tagged); PRUNE
-   stale entries. Write the draft; do not commit.
+1. WORKTREES: `git worktree list` plus git_branch values in .orchestra/subagent-children.json
+   (not only .cursor/worktrees/<ticket>). Per path, check the DIRECTORY
+   (`git -C <p> status --porcelain`), never the refs. Dirty → RESCUE NEEDED + exact
+   commands (named branch, never detached HEAD, never stash). Clean+merged → SAFE TO
+   REMOVE + command. Cursor 3.5+ may delete unmanaged worktree dirs; named-branch
+   commits are the preservation.
+2. MEMORY / CHARTER STEWARD: follow docs/AGENT-MEMORY.md **How to fill** (topic · path ·
+   as-of date · one-line lesson); PRUNE stale entries. If How to fill or ## Current is
+   missing, restore headings from docs/orchestra/AGENT-MEMORY.framework.md without wiping
+   entries. On AGENTS.md: ## How to fill, ## Orchestra, ## Memory must exist — append a
+   missing ## Orchestra block from the framework; never overwrite filled slots. Write
+   the draft; do not commit.
 3. ADHERENCE CHECKLIST (from .orchestra/state.json + git): every ledger ticket has a review
    verdict; `git branch --no-merged <feature>` empty for the wave's tickets; redteam record
-   present; gate record hash equals HEAD; .orchestra/hook-failures.log empty (report lines).
+   present; gate record hash equals HEAD; .orchestra/hook-failures.log empty (report lines);
+   charter headings present.
 4. SWEEP [L3]: expired RESEARCH.md, [DEBUG-] lines, harvested throwaway branches, dead
    .orchestra/ state.
 Report: Worktrees / Memory / Adherence / Sweep. You propose; the orchestrator disposes.
@@ -151,8 +173,9 @@ deploy=<policy per env>. Use that provider's CLI:
 Evidence for the PR body: <gate report + audit verdicts + spec link>.
 UNGATED: push the feature branch; open/update the (draft) PR/MR with evidence; MERGE when
 the brief shows fast-gate green at HEAD, or (server_side_gate) mark ready + auto-complete
-and let the host's policy land it (the hook's Cursor ask to the user IS the merge approval
-— do not stage-and-pause merges); revert of a merge commit restoring the last gated hash.
+and let the host's policy land it. Hook ask is a local-IDE tripwire, not the merge
+approval of record. Do not stage-and-pause merges. Ungated also: revert of a merge
+commit restoring the last gated hash.
 GATED (stage + pause): deploy (unless the delivery declaration marks the environment
 auto AND the diff has no migrations/schema changes), external sends, schema changes,
 non-recoverable deletes → NEEDS-APPROVAL with staged state, exact command, blast radius

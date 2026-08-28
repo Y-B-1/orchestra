@@ -1,6 +1,7 @@
 ---
 name: diagnose
-description: Diagnosis loop for bugs, failing tests, regressions, and performance problems. Build a feedback loop first — that IS the work — then hypothesize, instrument, and fix through a one-ticket execute pass with the regression test written first.
+description: Main session only. Workers never load this. Diagnosis loop for bugs and failing tests — feedback loop first, then a one-ticket execute pass. Routing: flow.json diagnose.* and intake.
+disable-model-invocation: true
 ---
 
 # Diagnose

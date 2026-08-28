@@ -1,6 +1,6 @@
 ---
 name: red-teamer
-description: Fresh-context skeptic. Attacks a spec, plan, or design through ONE assigned lens — requirements, feasibility, or scope — or judges between finished alternatives. Use before committing to any plan; a plan that passes red team on the first try means the skeptic failed.
+description: Orchestrator-dispatched only. Do not auto-delegate. Fresh-context skeptic; one lens per dispatch (requirements / feasibility / scope / judge).
 readonly: true
 model: inherit  # judgement tier — see skills/orchestrator/models.md
 ---

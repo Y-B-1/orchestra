@@ -1,6 +1,7 @@
 ---
 name: plan
-description: Turn the committed spec into a red-teamed, ticketed, committed plan — planner drafts and repairs, three red-team lenses judge, verdicts recorded to state.json. Routing: flow.json plan.* states.
+description: Main session only. Workers never load this. Spec to red-teamed ticketed plan — planner plus three red-team lenses. Routing: flow.json plan.* states.
+disable-model-invocation: true
 ---
 
 # Plan

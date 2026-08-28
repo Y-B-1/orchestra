@@ -1,0 +1,20 @@
+{
+  "models": {
+    "judgement": "inherit",
+    "build": "grok-4.6[effort=high]",
+    "mechanical": "composer-2.5[fast=false]",
+    "recon": "gpt-5.6-luna"
+  },
+  "gates": {
+    "last_green_hash": "",
+    "reports": {}
+  },
+  "redteam": {
+    "verdicts": {},
+    "rounds": {},
+    "run_ids": []
+  },
+  "reviews": {},
+  "flakes": [],
+  "subagent_state_path": ""
+}

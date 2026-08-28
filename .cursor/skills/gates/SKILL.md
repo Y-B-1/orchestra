@@ -1,6 +1,7 @@
 ---
 name: gates
-description: Verification policy — one always-on fast set (lint, typecheck, scoped unit, smoke core, framework doctor, scoped e2e on flow changes), mechanical scope widening, flake quarantine, and a detached user-triggered full suite. Routing: flow.json gates.fast and fullsuite.run.
+description: Main session only. Workers never load this. Fast-gate policy, scope widening, flake quarantine, user-triggered full suite. Routing: flow.json gates.fast and fullsuite.run.
+disable-model-invocation: true
 ---
 
 # Gates
@@ -26,3 +27,4 @@ The full set never belongs in a PR's required checks. On Azure DevOps, schedule 
 - **Voiding is mechanical**: `git diff --stat <green-hash>..HEAD -- ':!docs' ':!*.md'` non-empty = void, re-run; docs/memory-only commits do not void. No judgment allowed either direction.
 - **FLAKY = quarantine, not a question**: first occurrence → ship allowed, flake ticketed and quarantined in state.json; second occurrence of the same flake → mandatory fix ticket before that surface merges again. Never loop-until-green; never ask the user per flake after the first.
 - Full-suite failures become intake items (bug lane), prioritized with the user — the run itself never blocks anything.
+- After a **green** fast set, if the feature is complete (or the small lane just closed), the next state is **`review.pr`** — not merge. The inclusive review does not re-run this command list.

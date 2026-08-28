@@ -1,9 +1,7 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
+<html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Orchestra Routing Graph v2</title>
+<title>Orchestra routing graph</title>
 <style>
   :root{
     --bg:#f6f7f9; --card:#ffffff; --ink:#1a1d21; --muted:#5b6470; --line:#e3e6ea;
@@ -43,220 +41,751 @@
   .gate{background:var(--gatebg)}
   .inv{background:var(--invbg);border:1px solid var(--line);border-radius:10px;padding:1rem 1.3rem}
   .inv li{margin:.35rem 0}
-  .arrow{text-align:center;color:var(--muted);font-size:1.1rem;line-height:1;margin:-.2rem 0}
-  .note{font-size:.85rem;color:var(--muted);margin-top:.5rem}
   .roster{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:.7rem}
   .roster .state{padding:.7rem .9rem}
   .roster p{margin:.2rem 0 0;font-size:.88rem;color:var(--muted)}
-  .lanes{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:.9rem}
+  .match{font-size:.8rem;color:var(--muted);margin:0 0 .4rem}
   @media(max-width:640px){ td.if{width:40%} body{padding:1rem .6rem 3rem} }
-</style>
-</head>
-<body><div class="wrap">
-<h1>Orchestra Routing Graph v2</h1>
-<p class="sub">Human view of <code>.cursor/skills/orchestrator/flow.json</code>, the only statement of routing. Every transition is announced in chat. Green blocks are standing duties that fire on every entry; red BACK TO rows are first-class backward edges with the payload that travels; pills name dispatched roles (with <code>@L1..L3</code> depth). Verbatim rulings, evidence-gated DONE, and honest terminal states apply everywhere.</p>
-
-<h2>Roster (12 + the orchestrator)</h2>
-<div class="roster">
-  <div class="state"><h3>orchestrator</h3><p>Main session. Talks to you, dispatches everyone, adjudicates, merges, approves, owns memory.</p></div>
-  <div class="state"><h3>scout <span class="role r-scout">read-only</span></h3><p>Codebase recon: files, symbols, conventions, verified tooling commands, path-rule harvest.</p></div>
-  <div class="state"><h3>researcher <span class="role r-researcher">background</span></h3><p>Primary sources only → cited RESEARCH.md with expiry.</p></div>
-  <div class="state"><h3>architect <span class="role r-author">docs only</span></h3><p>Drafts approach sketches and the spec from settled verbatim rulings. Open decisions come back as questions, never choices.</p></div>
-  <div class="state"><h3>planner <span class="role r-author">docs only</span></h3><p>Drafts and repairs the ticketed plan; red-team findings loop to it, rounds 1&ndash;3.</p></div>
-  <div class="state"><h3>red-teamer <span class="role r-red">read-only</span></h3><p>One lens per dispatch: requirements &middot; feasibility &middot; scope &middot; judge. First principles, reverse-engineered failure, interaction space weighted by probability.</p></div>
-  <div class="state"><h3>builder</h3><p>One ticket, TDD, assigned tree. Fresh per ticket. Trailer feeds the ledger.</p></div>
-  <div class="state"><h3>builder-max <span class="role r-builder">ceiling tier</span></h3><p>Escalation, findings round 4 only. Reads the failure history first.</p></div>
-  <div class="state"><h3>reviewer <span class="role r-reviewer">read-only</span></h3><p>Fresh eyes on one ticket's diff. Builder reports are never evidence.</p></div>
-  <div class="state"><h3>auditor <span class="role r-auditor">read-only</span></h3><p>Whole change-set, one axis: Standards or Spec. Parallel, never merged.</p></div>
-  <div class="state"><h3>gatekeeper</h3><p>Runs the command list the orchestrator derived; honest exit codes at a named hash. Fixes nothing.</p></div>
-  <div class="state"><h3>janitor</h3><p>Worktree directory inspection, memory draft from the ledger excerpt, process-adherence checklist. Proposes only.</p></div>
-  <div class="state"><h3>releaser</h3><p>Draft PRs early; stages gated actions and pauses. The hook's user-facing ask is the floor; its block is the record.</p></div>
+</style></head><body><div class="wrap">
+<h1>Orchestra routing graph</h1>
+<p class="sub">Generated from <code>.cursor/skills/orchestrator/flow.json</code> (the only statement of routing). Do not edit this HTML by hand — run <code>docs/orchestra/generate-flow-html.py</code>. Intake is exclusive (<code>match: first</code>). Green blocks are standing duties; red BACK TO rows carry a payload. Autonomy is a first-class state.</p>
+<h2>Roster</h2><div class="roster">
+<div class="state"><h3>orchestrator</h3><p>main session — talks to the user, dispatches everyone, adjudicates, merges, approves, owns memory</p></div>
+<div class="state"><h3>scout</h3><p>.cursor/agents/scout.md</p></div>
+<div class="state"><h3>researcher</h3><p>.cursor/agents/researcher.md</p></div>
+<div class="state"><h3>architect</h3><p>.cursor/agents/architect.md</p></div>
+<div class="state"><h3>planner</h3><p>.cursor/agents/planner.md</p></div>
+<div class="state"><h3>red-teamer</h3><p>.cursor/agents/red-teamer.md</p></div>
+<div class="state"><h3>builder</h3><p>.cursor/agents/builder.md</p></div>
+<div class="state"><h3>builder-max</h3><p>.cursor/agents/builder-max.md</p></div>
+<div class="state"><h3>reviewer</h3><p>.cursor/agents/reviewer.md</p></div>
+<div class="state"><h3>pr-reviewer</h3><p>.cursor/agents/pr-reviewer.md</p></div>
+<div class="state"><h3>auditor</h3><p>.cursor/agents/auditor.md</p></div>
+<div class="state"><h3>gatekeeper</h3><p>.cursor/agents/gatekeeper.md</p></div>
+<div class="state"><h3>janitor</h3><p>.cursor/agents/janitor.md</p></div>
+<div class="state"><h3>releaser</h3><p>.cursor/agents/releaser.md</p></div>
 </div>
-
-<h2>Intake: three lanes + resume</h2>
-<div class="phase">
-<div class="state"><h3>intake</h3><table>
-<tr><td class="if">STATE.md has an OPEN run</td><td class="then">reconcile first: stamp vs HEAD vs tree; the tree is truth; repair STATE.md, resume at its recorded state</td></tr>
-<tr><td class="if">non-trivial (multi-wave, migration, hard to reverse)</td><td class="then">full chain: design.recon</td></tr>
-<tr><td class="if">small standard change (~2&ndash;5 files, reversible)</td><td class="then">small lane</td></tr>
-<tr><td class="if">trivial (one file, obvious)</td><td class="then">trivial.inline: two-sentence design, evidence-gated DONE</td></tr>
-<tr><td class="if">bug / failing / slow</td><td class="then">bug.feedback-loop (diagnose)</td></tr>
-<tr><td class="if">"review this branch/PR"</td><td class="then">audit.run, standalone</td></tr>
-<tr><td class="if">question</td><td class="then">answer from recon or a primary source, end <span class="role r-scout">scout@L1</span> <span class="role r-researcher">researcher@L1</span></td></tr>
-<tr><td class="if">"run the full e2e"</td><td class="then">fullsuite.run, detached from any PR</td></tr>
-</table></div>
-<div class="lanes">
-<div class="state"><h3>small lane</h3><table>
-<tr><td class="if">approach OK'd in chat</td><td class="then">one builder (main tree) + one fresh reviewer + fast gate; PR if the repo lands via PRs <span class="role r-builder">builder</span> <span class="role r-reviewer">reviewer</span> <span class="role r-gatekeeper">gatekeeper@L1</span></td></tr>
-<tr><td class="if">surprise / ownership conflict / irreversible step</td><td class="then back">intake, promoted to the full chain</td></tr>
-</table></div>
-<div class="state"><h3>trivial.inline</h3><table>
-<tr><td class="if">grows past one file or one surprise</td><td class="then back">intake, reclassified</td></tr>
-</table></div>
-</div>
-</div>
-
-<h2>Design</h2>
-<div class="phase">
-<div class="state"><h3>design.recon &rarr; design.frontier &rarr; design.approaches</h3>
-<div class="always">No product code in any design state. Every ruling recorded verbatim at the moment it is made. Diverge before converging &mdash; never present one option as if it were the only one.</div>
+<h2>Intake</h2><div class="phase">
+<div class="state"><h3>intake</h3>
+<p class="match">match: first</p>
+<p class="q">What shape is the request, and is there an open run to resume?</p>
 <table>
-<tr><td class="if">codebase can answer</td><td class="then">scouts in parallel; never ask the user those <span class="role r-scout">scout@L2</span></td></tr>
-<tr><td class="if">unsettled decisions</td><td class="then">frontier rounds: all ready questions at once, numbered, each with a recommendation</td></tr>
-<tr><td class="if">the space isn't open yet (new feature, unfamiliar problem, or one idea on the table)</td><td class="then"><b>brainstorm</b>: 6&ndash;10 genuinely distinct options, unfiltered &mdash; one reusing what exists, one costing far less code, one removing a requirement, one deliberately bold; present before narrowing <span class="role r-author">architect:brainstorm@L2</span></td></tr>
-<tr><td class="if">hard-to-reverse interface</td><td class="then">design-it-twice: parallel sketches + judge <span class="role r-author">architect:sketch</span> <span class="role r-red">red-teamer:judge</span></td></tr>
-<tr><td class="if">only running code can answer</td><td class="then">throwaway prototype on a disposable branch; harvest; record the ruling</td></tr>
-<tr><td class="if">post-cutoff API / standard</td><td class="then">queue background research for the plan phase <span class="role r-researcher">researcher</span></td></tr>
-</table></div>
-<div class="arrow">&darr;</div>
-<div class="state gate"><h3>design.spec &rarr; design.gate (HARD GATE)</h3>
-<div class="always">Red-team requirements spot-check against the rulings before the spec is presented. Approval is explicit, never inferred.</div>
-<table>
-<tr><td class="if">3+ rulings or multiple approaches</td><td class="then">architect drafts the spec; orchestrator diffs its Rulings section byte-for-byte <span class="role r-author">architect:spec@L2</span> <span class="role r-red">red-teamer:requirements@L1</span></td></tr>
-<tr><td class="if">small design</td><td class="then">orchestrator drafts inline and says so, same self-review</td></tr>
-<tr><td class="if">spot-check finds ruling drift</td><td class="then back">design.spec, carrying the drift findings</td></tr>
-<tr><td class="if">user approves</td><td class="then">commit the spec &rarr; plan</td></tr>
-<tr><td class="if">changes requested</td><td class="then back">design.spec, carrying the user's words verbatim as new rulings</td></tr>
-</table></div>
+<tr>
+<td class="if">docs/orchestra/STATE.md exists with an OPEN run</td>
+<td class="then">reconcile BEFORE acting: compare its stamp to `git rev-parse HEAD`, `git status --porcelain`, `git worktree list`; on mismatch the TREE is truth — repair STATE.md first, then enter at its recorded state (do not also classify into another lane this turn)</td>
+</tr>
+<tr>
+<td class="if">the user asks for an unattended/continuous run (&#x27;keep going until done&#x27;, &#x27;run this overnight&#x27;) AND a ledger exists (docs/plans/&lt;feature&gt;-ledger.md or STATE.md ledger pointer)</td>
+<td class="then">confirm the caps and the stop rules with the user, then enter the autonomy loop → autonomy.loop</td>
+</tr>
+<tr>
+<td class="if">the user asks for an unattended/continuous run but no ledger exists</td>
+<td class="then">NOT-READY: autonomy only advances an existing ledger. Classify the work into a lane and plan first; do not enter autonomy.loop</td>
+</tr>
+<tr>
+<td class="if">full-suite request (&#x27;run the full e2e&#x27;, scheduled trigger)</td>
+<td class="then">→ fullsuite.run</td>
+</tr>
+<tr>
+<td class="if">&#x27;review this branch/PR&#x27;</td>
+<td class="then">→ audit.run</td>
+</tr>
+<tr>
+<td class="if">bug, failing test, regression, &#x27;it&#x27;s slow&#x27;</td>
+<td class="then">→ bug.feedback-loop</td>
+</tr>
+<tr>
+<td class="if">question the codebase can answer</td>
+<td class="then">answer from recon, END <span class="role r-scout">scout@L1</span></td>
+</tr>
+<tr>
+<td class="if">external API / version question</td>
+<td class="then">answer from a primary-source check, END — orchestrator chooses foreground vs background; researcher is not always-background <span class="role r-researcher">researcher@L1</span></td>
+</tr>
+<tr>
+<td class="if">trivial: one file, obvious, reversible</td>
+<td class="then">→ trivial.inline</td>
+</tr>
+<tr>
+<td class="if">small standard change: roughly 2–5 files, no migration, reversible</td>
+<td class="then">→ small.design</td>
+</tr>
+<tr>
+<td class="if">non-trivial feature/change: multi-wave, multi-subsystem, a migration, or hard to reverse</td>
+<td class="then">→ design.recon</td>
+</tr>
+<tr>
+<td class="if">ambiguous between lanes</td>
+<td class="then">one classification question to the user with a recommendation; no work starts</td>
+</tr>
+</table>
 </div>
-
-<h2>Plan</h2>
-<div class="phase">
-<div class="state"><h3>plan.recon &rarr; plan.draft</h3><table>
-<tr><td class="if">design recon left gaps / briefs need the path-rule harvest / new session</td><td class="then">scout maps the gaps <span class="role r-scout">scout@L2</span></td></tr>
-<tr><td class="if">recon suffices</td><td class="then">carry it forward and say so</td></tr>
-<tr><td class="if">always</td><td class="then">planner drafts tracer-bullet tickets (files owned, test-first at agreed seams, mechanical done_when + guards, blocking edges); orchestrator reviews + diffs quoted rulings <span class="role r-author">planner@L2</span></td></tr>
-</table></div>
-<div class="arrow">&darr;</div>
-<div class="state gate"><h3>plan.redteam: three lenses, always</h3>
-<div class="always">Verdicts, rounds, and run ids recorded to .orchestra/state.json; the plan is not executable without its redteam record.</div>
-<table>
-<tr><td class="if">entry</td><td class="then">requirements + feasibility + scope, parallel, fresh context <span class="role r-red">red-teamer &times;3 @L2</span></td></tr>
-<tr><td class="if">NOT-READY, rounds 1&ndash;3</td><td class="then back">plan.draft: only the failed lens's findings, to the planner; re-dispatch only that lens</td></tr>
-<tr><td class="if">round 4+</td><td class="then">orchestrator adjudicates: repair inline, park with the user, or honest NOT-READY</td></tr>
-<tr><td class="if">finding contradicts the spec</td><td class="then"><b>to the user</b>, verbatim, never silently repaired</td></tr>
-<tr><td class="if">READY with ZERO findings, round 1, large/irreversible plan</td><td class="then">suspect the skeptics; tighten briefs, rerun once. READY with minor findings is normal and accepted</td></tr>
-<tr><td class="if">all READY</td><td class="then">commit the plan &rarr; execute</td></tr>
-</table></div>
 </div>
-
-<h2>Execute</h2>
-<div class="phase">
-<div class="state"><h3>execute.setup &rarr; execute.ticket-loop</h3>
-<div class="always">Separate ledger file before the first dispatch. Never git stash while worktrees exist.</div>
+<h2>Lanes</h2><div class="phase">
+<div class="state"><h3>trivial.inline</h3>
 <table>
-<tr><td class="if">1 builder</td><td class="then">main tree, no worktree</td></tr>
-<tr><td class="if">2+ builders sharing one checkout (local, or sub-agents inside one cloud VM)</td><td class="then">one worktree per builder; deps installed + toolchain PROVEN before dispatch; own ports</td></tr>
-<tr><td class="if">each builder is its own cloud agent (own VM + clone)</td><td class="then">no worktrees &mdash; the VM is the isolation; each pushes its branch, integration fetches them; only committed things travel</td></tr>
-<tr><td class="if">toolchain proof fails twice</td><td class="then">collapse the wave to sequential in the main tree</td></tr>
-<tr><td class="if">unblocked tickets</td><td class="then">fresh builder each, parallel, complete self-contained briefs <span class="role r-builder">builder@L2 &times;N</span></td></tr>
-<tr><td class="if">builder BLOCKED on a plan defect</td><td class="then back">plan.draft, as a planner L1 repair; other tickets keep running</td></tr>
-</table></div>
-<div class="arrow">&darr;</div>
-<div class="state gate"><h3>execute.review: per-ticket gate, bounded loop</h3>
-<div class="always">Builder reports are never evidence. Verdicts recorded per ticket to state.json + ledger.</div>
+<tr>
+<td class="if">always</td>
+<td class="then">two-sentence design in chat; implement inline; evidence-gated DONE (command + exit code); END — no STATE.md obligation</td>
+</tr>
+<tr>
+<td class="if">it grows past one file or one surprise</td>
+<td class="then back">intake — reclassify into small.design or design.recon</td>
+</tr>
+</table>
+</div>
+<div class="state"><h3>small.design</h3>
+<p class="q">Small lane: is the approach agreed in chat?</p>
+<div class="always">Recon first when the code can answer (scout@L1); never ask the user what the codebase knows.</div>
 <table>
-<tr><td class="if">entry</td><td class="then">fresh reviewer: ticket + diff + claimed evidence <span class="role r-reviewer">reviewer@L2</span></td></tr>
-<tr><td class="if">implausible evidence</td><td class="then">gatekeeper re-proof: that done_when only <span class="role r-gatekeeper">gatekeeper@L1</span></td></tr>
-<tr><td class="if">findings, rounds 1&ndash;3</td><td class="then back">same builder resumes with the findings</td></tr>
-<tr><td class="if">round 4</td><td class="then">escalation with full history <span class="role r-builder">builder-max</span></td></tr>
-<tr><td class="if">round 5</td><td class="then">orchestrator adjudicates: fix / park / BLOCKED</td></tr>
-<tr><td class="if">contradicts plan/spec</td><td class="then"><b>to the user</b>, verbatim</td></tr>
-</table></div>
-<div class="arrow">&darr;</div>
-<div class="state"><h3>execute.integrate &rarr; execute.wave-close (fixed order)</h3>
-<div class="always">1&nbsp;Integrate: orchestrator merges ticket branches by blocking edges, both intents preserved. 2&nbsp;Close: janitor (worktrees or 2+ tickets) + memory in the batch-closing commit + STATE.md rewrite + draft PR on wave 1. 3&nbsp;Gate at the final HEAD.</div>
+<tr>
+<td class="if">approach not yet agreed</td>
+<td class="then">present the approach with a recommendation and wait for the explicit OK</td>
+</tr>
+<tr>
+<td class="if">approach stated in chat and user explicitly OKs it</td>
+<td class="then">→ small.build</td>
+</tr>
+<tr>
+<td class="if">a surprise, ownership conflict, or irreversible step appears</td>
+<td class="then back">intake — promote to the full chain (design.recon)</td>
+</tr>
+</table>
+</div>
+<div class="state"><h3>small.build</h3>
+<div class="always">Open a minimal STATE.md run entry at dispatch (lane: small, branch, next action) — this is what makes an interrupted small task resumable.</div>
+<div class="always">One fresh builder in the main tree, complete self-contained brief (template: briefs.md; the chat-approved approach text serves as the ticket).</div>
+<div class="always">One fresh reviewer on the diff.</div>
 <table>
-<tr><td class="if">conflict too entangled</td><td class="then">fresh builder with both tickets pasted <span class="role r-builder">builder</span></td></tr>
-<tr><td class="if">batch spanned 2+ tickets or worktrees exist</td><td class="then">janitor: rescue-or-remove, memory draft, adherence checklist <span class="role r-janitor">janitor@L2</span></td></tr>
-<tr><td class="if">first wave, PR-landing repo</td><td class="then">open the DRAFT PR now, never a blocker <span class="role r-releaser">releaser@L1</span></td></tr>
-</table></div>
+<tr>
+<td class="if">entry</td>
+<td class="then">dispatch the builder, then the reviewer on its diff <span class="role r-builder">builder@L2</span><span class="role r-reviewer">reviewer@L1</span></td>
+</tr>
+<tr>
+<td class="if">review PASS</td>
+<td class="then">→ small.close</td>
+</tr>
+<tr>
+<td class="if">reviewer flags implausible evidence</td>
+<td class="then">gatekeeper re-proof of that done_when only; PASS continues, FAIL counts as a findings round <span class="role r-gatekeeper">gatekeeper:re-proof@L1</span></td>
+</tr>
+<tr>
+<td class="if">FINDINGS rounds 1–3</td>
+<td class="then">same builder resumes with the findings; re-review</td>
+</tr>
+<tr>
+<td class="if">FINDINGS round 4</td>
+<td class="then">escalation builder with the full findings history <span class="role r-builder">builder-max</span></td>
+</tr>
+<tr>
+<td class="if">FINDINGS round 5</td>
+<td class="then">orchestrator adjudicates: fix inline decision, park with the user, or promote to the full chain</td>
+</tr>
+</table>
 </div>
-
-<h2>Gates</h2>
-<div class="phase">
-<div class="state gate"><h3>gates.fast: the one always-on set</h3>
-<div class="always">Orchestrator derives and approves the command list (never the gatekeeper's guess). Report recorded to state.json keyed by hash. Mechanical widening: manifests, build config, migrations/schema, shared types/tokens, auth.</div>
+<div class="state"><h3>small.close</h3>
+<div class="always">gates.fast set at HEAD (see gates.fast contents); record the review verdict and set gates.last_green_hash in .orchestra/state.json exactly as gates.fast does.</div>
+<div class="always">Rewrite STATE.md (close the run entry); memory line to docs/AGENT-MEMORY.md only if a trap was found.</div>
 <table>
-<tr><td class="if">entry</td><td class="then">lint + typecheck + scoped unit + smoke core + framework doctor (React Doctor on React repos) + scoped e2e when a user-facing flow changed <span class="role r-gatekeeper">gatekeeper@L2</span></td></tr>
-<tr><td class="if">FAIL</td><td class="then back">ticket-loop: lone builder in the main tree; re-run after, skipping the wave-close batch</td></tr>
-<tr><td class="if">FLAKY</td><td class="then">quarantine: 1st occurrence ship + ticket; 2nd same flake = mandatory fix before that surface merges. No per-flake questions after the first</td></tr>
-<tr><td class="if">green, more waves</td><td class="then">next wave</td></tr>
-<tr><td class="if">green, feature complete</td><td class="then">audit.decide</td></tr>
-</table><p class="note">Voiding is mechanical: non-docs commits after a green void it; docs/memory commits do not. Full suite: user-triggered only, whole codebase, detached from PRs, off the critical path; failures become bug-lane intake items.</p></div>
+<tr>
+<td class="if">entry</td>
+<td class="then">run the fast set <span class="role r-gatekeeper">gatekeeper:fast@L1</span></td>
+</tr>
+<tr>
+<td class="if">gate green and the repo lands via PRs</td>
+<td class="then">open the PR with evidence if one is not already open (ungated) → review.pr <span class="role r-releaser">releaser@L1</span></td>
+</tr>
+<tr>
+<td class="if">gate green, no PR flow</td>
+<td class="then">→ review.pr</td>
+</tr>
+<tr>
+<td class="if">gate FAIL</td>
+<td class="then back">small.build — the failing gate excerpt as findings</td>
+</tr>
+</table>
 </div>
-
-<h2>Audit &rarr; Release</h2>
-<div class="phase">
-<div class="state"><h3>audit.decide &rarr; audit.run</h3>
-<div class="always">Two axes presented verbatim, never merged.</div>
+</div>
+<h2>Design</h2><div class="phase">
+<div class="state"><h3>design.recon</h3>
+<div class="always">No product code in any design state (throwaway prototype code on a clearly-marked disposable branch is not product code).</div>
+<div class="always">Record every user decision verbatim, at the moment it is made.</div>
 <table>
-<tr><td class="if">2+ tickets in the batch, or the user asks</td><td class="then">Standards + Spec in parallel <span class="role r-auditor">auditor &times;2 @L2</span></td></tr>
-<tr><td class="if">single-ticket run</td><td class="then">skip: the reviewer already saw the whole diff &rarr; release</td></tr>
-<tr><td class="if">standalone review request</td><td class="then">present both reports; END. No gates, no release, no push</td></tr>
-<tr><td class="if">findings on executed work</td><td class="then back">ticket-loop as findings rounds; re-audit the touched surface</td></tr>
-</table></div>
-<div class="arrow">&darr;</div>
-<div class="state gate"><h3>release.merge &rarr; release.deploy</h3>
-<div class="always">Delivery declaration read (AGENTS.md + .orchestra/delivery.json): provider decides the CLI &mdash; <code>gh</code> &middot; <code>az repos</code> &middot; <code>glab</code> &middot; plain <code>git</code>. Hook floor: protected-branch landings on any of them ask the real user, and that ask IS the merge approval; denied while gates.last_green_hash &ne; HEAD. Merge done with nothing to deploy &rarr; straight to cleanup.</div>
+<tr>
+<td class="if">the codebase can answer open questions</td>
+<td class="then">dispatch scouts in parallel for all of them → design.frontier <span class="role r-scout">scout@L2</span></td>
+</tr>
+<tr>
+<td class="if">no open codebase questions</td>
+<td class="then">→ design.frontier</td>
+</tr>
+</table>
+</div>
+<div class="state"><h3>design.frontier</h3>
+<p class="q">Are there unsettled questions only the user can decide?</p>
 <table>
-<tr><td class="if">server_side_gate (Azure DevOps branch policy &amp; co.)</td><td class="then">make the host's required checks mirror the fast set; mark ready + auto-complete &mdash; the platform gates the <b>preview merge commit</b>, so the gated hash is provably the shipped hash <span class="role r-releaser">releaser@L2</span></td></tr>
-<tr><td class="if">no host gate: green at HEAD, branch current</td><td class="then">mark ready with the gate report; merge fast-forward so the gated hash becomes the target HEAD <span class="role r-releaser">releaser@L2</span></td></tr>
-<tr><td class="if">branch behind the target</td><td class="then">merge the target INTO the branch (rebases are guardrail-blocked), re-gate, then fast-forward <span class="role r-gatekeeper">gatekeeper:fast@L1</span></td></tr>
-<tr><td class="if">fast-forward impractical</td><td class="then">merge, then auto re-run the fast set at the target HEAD; only that green releases a deploy <span class="role r-gatekeeper">gatekeeper:fast@L1</span></td></tr>
-<tr><td class="if">code commits after the green gate (no host gate)</td><td class="then back">gates.fast at current HEAD</td></tr>
-<tr><td class="if">deploy policy auto (low-blast env) and NO migrations</td><td class="then">deploy; verify the health check</td></tr>
-<tr><td class="if">production, or migrations present</td><td class="then">stage + NEEDS-APPROVAL (spec-axis audit must be green for production); on your chat approval, execute exactly the staged command. On Azure DevOps a Pipelines environment approval check is the natural home for this pause <span class="role r-releaser">releaser@L2</span></td></tr>
-<tr><td class="if">health check fails / main breaks</td><td class="then">release.rollback: revert the merge first (a proven hash restores auto-executably), diagnose second &rarr; bug lane</td></tr>
-</table></div>
-<div class="arrow">&darr;</div>
-<div class="state"><h3>cleanup.final &rarr; terminal.done</h3><table>
-<tr><td class="if">closing</td><td class="then">zero live worktrees; ledger CLOSED; STATE.md idle (keeping any deferred: line); expired RESEARCH.md gone</td></tr>
-<tr><td class="if">declaring DONE</td><td class="then">quote the evidence; only then "job is finished". DONE / BLOCKED / NOT-READY / NEEDS-APPROVAL are all honest endings</td></tr>
-</table></div>
+<tr>
+<td class="if">yes</td>
+<td class="then">ask ALL questions whose prerequisites are settled in one round, numbered, each with a recommended answer; loop until none remain</td>
+</tr>
+<tr>
+<td class="if">a question is a fact, not a decision</td>
+<td class="then">route it to recon or research instead of the user <span class="role r-scout">scout@L1</span><span class="role r-researcher">researcher@L1</span></td>
+</tr>
+<tr>
+<td class="if">none remain</td>
+<td class="then">→ design.approaches</td>
+</tr>
+</table>
 </div>
-
-<h2>Bug lane</h2>
-<div class="phase">
-<div class="state"><h3>bug.feedback-loop</h3><p class="q">Does a named, already-run, red-capable, fast, deterministic command reproduce it?</p><table>
-<tr><td class="if">no loop yet</td><td class="then">build one (failing test &rarr; curl &rarr; CLI diff &rarr; headless browser &rarr; bisect harness); non-deterministic bugs get their reproduction rate raised and stated; perf bugs get a measured baseline first; no loop possible &rarr; stop and ask</td></tr>
-<tr><td class="if">loop exists</td><td class="then">minimise; 3&ndash;5 ranked falsifiable hypotheses (shown, non-blocking); instrument one variable at a time; the fix runs as one ticket through execute with the regression test first</td></tr>
-<tr><td class="if">fix verified, trivial diff</td><td class="then">clean instrumentation; winning hypothesis in the commit message &rarr; done with evidence</td></tr>
-</table></div>
+<div class="state"><h3>design.approaches</h3>
+<p class="match">match: all</p>
+<p class="q">Has the space been opened (divergence) before it is narrowed (convergence)?</p>
+<div class="always">Diverge before converging: never present one option as though it were the only one. Judging during divergence kills the interesting option.</div>
+<table>
+<tr>
+<td class="if">the solution space is not yet opened — a new feature, an unfamiliar problem, or the user has only one idea on the table</td>
+<td class="then">architect brainstorm: 6–10 genuinely distinct options, unfiltered, including a reuse-what-exists option, a far-less-code option, a remove-the-requirement option, and one deliberately bold one; present the list to the user before narrowing <span class="role r-author">architect:brainstorm@L2</span></td>
+</tr>
+<tr>
+<td class="if">standard shape</td>
+<td class="then">present 2–3 approaches with trade-offs and ONE recommendation → design.spec</td>
+</tr>
+<tr>
+<td class="if">a hard-to-reverse module interface exists</td>
+<td class="then">architect sketches 2–3 radically different interfaces in parallel · red-teamer:judge compares on depth/locality/seams <span class="role r-author">architect:sketch@L2</span><span class="role r-red">red-teamer:judge@L2</span></td>
+</tr>
+<tr>
+<td class="if">a question only running code can answer</td>
+<td class="then">throwaway prototype on a disposable branch (clearly marked, one command to run, no polish); harvest the answer; record the ruling</td>
+</tr>
+<tr>
+<td class="if">design leans on an industry standard or post-cutoff API</td>
+<td class="then">queue researcher for the plan phase (orchestrator chooses background; the agent file is not always-background) <span class="role r-researcher">researcher@L2</span></td>
+</tr>
+<tr>
+<td class="if">approach settled (winner chosen, prototype harvested, or approaches presented)</td>
+<td class="then">→ design.spec</td>
+</tr>
+</table>
 </div>
-
-<h2>Interrupts (backward edges from anywhere)</h2>
-<div class="phase">
-<div class="state"><table>
-<tr><td class="if">you change a ruling mid-run</td><td class="then back">design.gate with the new ruling verbatim; the revised spec then invalidates affected tickets: planner repair + re-red-team of touched lenses before execution resumes</td></tr>
-<tr><td class="if">you interrupt execution</td><td class="then">stop dispatching; report ledger state; resume from the ledger, never re-dispatch blind</td></tr>
-<tr><td class="if">a dispatch dies</td><td class="then">check ledger + tree for partial commits, then dispatch fresh</td></tr>
-</table></div>
+<div class="state"><h3>design.spec</h3>
+<p class="q">Is the spec drafted?</p>
+<div class="always">Terms ruled on this phase are written to CONTEXT.md (glossary only). Seams the tests will assert at are named in the spec — the plan inherits them.</div>
+<table>
+<tr>
+<td class="if">3+ rulings or more than one approach explored</td>
+<td class="then">architect drafts the spec from recon + winning approach + verbatim rulings; diff its returned Rulings section against your record — any difference is a defect → design.gate <span class="role r-author">architect:spec@L2</span></td>
+</tr>
+<tr>
+<td class="if">small design (fewer than ~3 rulings, one approach)</td>
+<td class="then">orchestrator drafts inline and says so; self-review for placeholders, contradictions, dual-readable lines, scope creep → design.gate</td>
+</tr>
+</table>
 </div>
-
-<h2>Running in the cloud</h2>
-<div class="phase">
-<div class="state"><h3>topology</h3><table>
-<tr><td class="if">default</td><td class="then">one cloud agent IS the orchestrator; sub-agents run inside its VM sharing one clone &mdash; the whole chain applies unchanged, worktrees included</td></tr>
-<tr><td class="if">parallel independent work</td><td class="then">one cloud agent per feature/ticket, each running its own mini-chain and returning a PR. Split <b>work</b> across VMs, never <b>roles</b> &mdash; role handoffs would become git round-trips</td></tr>
-<tr><td class="if">always</td><td class="then">only committed things travel: a VM is a fresh clone, so gitignored files (including .orchestra/state.json) are absent</td></tr>
-<tr><td class="if">conversation needed</td><td class="then">a cloud orchestrator reaches you asynchronously &mdash; run design and plan locally, send execute waves to the cloud</td></tr>
-<tr><td class="if">enforcement</td><td class="then"><code>ask</code> degrades to <b>deny</b> when headless; a protected landing with no readable gate record is denied; set <code>server_side_gate</code> so the host's branch policy is the gate &mdash; host-mediated PR completion stays allowed, direct pushes to protected branches never do</td></tr>
-</table></div>
+<div class="state gate"><h3>design.gate</h3>
+<p class="q">Did the user explicitly approve the spec?</p>
+<div class="always">Approval is explicit, never inferred.</div>
+<table>
+<tr>
+<td class="if">entry</td>
+<td class="then">red-team requirements spot-check on the spec vs the verbatim rulings, before presenting <span class="role r-red">red-teamer:requirements@L1</span></td>
+</tr>
+<tr>
+<td class="if">spot-check finds ruling drift</td>
+<td class="then back">design.spec — the drift findings (architect L1 revision)</td>
+</tr>
+<tr>
+<td class="if">user approves</td>
+<td class="then">commit the spec — it is the contract every later phase cites → plan.recon</td>
+</tr>
+<tr>
+<td class="if">changes requested</td>
+<td class="then back">design.spec — the user&#x27;s words, verbatim, as new rulings</td>
+</tr>
+</table>
 </div>
-
-<h2>Invariants (every state)</h2>
-<div class="inv"><ul>
-<li>Self-contained briefs: verbatim-critical excerpts pasted; bulk material as pointers the role reads itself.</li>
-<li>Sub-agents never spawn sub-agents (hook-enforced policy); all fan-out is the orchestrator's.</li>
-<li>Rulings travel verbatim: full quote only if one line, else pointer; never trimmed.</li>
-<li>Evidence = command + exit code without pipes, or both-theme screenshots.</li>
-<li>Worktrees only for 2+ concurrent builders; created, integrated, removed by the orchestrator.</li>
-<li>Judgement roles at the ceiling (inherit); the rest pinned at install; install.sh verifies.</li>
-<li>Approval floor is the hook's user-facing ask; files never authorize.</li>
-<li>Memory lands in the batch-closing commit; stale entries are pruned.</li>
-<li>Honest terminal states, always.</li>
-<li>Every transition announced: <code>flow: from &rarr; to (matched if)</code>.</li>
+</div>
+<h2>Plan</h2><div class="phase">
+<div class="state"><h3>plan.recon</h3>
+<p class="q">Does planning need recon beyond what design already gathered?</p>
+<table>
+<tr>
+<td class="if">design recon left open questions, ticket briefs need a path-rule harvest, or design happened in a previous session</td>
+<td class="then">scout maps the gaps + harvests .cursor/rules and AGENTS.md excerpts for the touched paths → plan.draft <span class="role r-scout">scout@L2</span></td>
+</tr>
+<tr>
+<td class="if">design recon suffices</td>
+<td class="then">carry it forward and say so in the plan → plan.draft</td>
+</tr>
+</table>
+</div>
+<div class="state"><h3>plan.draft</h3>
+<div class="always">Version-sensitive claims cite RESEARCH.md on disk — a ticket depending on research that does not exist yet is BLOCKED-ON-RESEARCH, not guessed.</div>
+<table>
+<tr>
+<td class="if">always</td>
+<td class="then">planner drafts the ticketed plan from spec + recon + research (brief template: briefs.md); orchestrator reviews the ticket summary and diffs quoted rulings against its record → plan.redteam <span class="role r-author">planner@L2</span></td>
+</tr>
+</table>
+</div>
+<div class="state"><h3>plan.redteam</h3>
+<p class="q">Do all three lenses return READY?</p>
+<div class="always">Record verdicts, rounds, and run ids into .orchestra/state.json — the plan is not executable without a redteam record.</div>
+<table>
+<tr>
+<td class="if">entry</td>
+<td class="then">three red-teamers in parallel, fresh context, one lens each: requirements (spec+rulings pasted) · feasibility (must name a breaking file/symbol) · scope (ownership traps, missing edges, hidden migrations, unguarded irreversibles) <span class="role r-red">red-teamer:requirements@L2</span><span class="role r-red">red-teamer:feasibility@L2</span><span class="role r-red">red-teamer:scope@L2</span></td>
+</tr>
+<tr>
+<td class="if">any lens NOT-READY, repair rounds 1–3</td>
+<td class="then back">plan.draft — ONLY the failed lens&#x27;s findings to the planner; re-dispatch ONLY that lens after repair, fresh context</td>
+</tr>
+<tr>
+<td class="if">repair round 4+</td>
+<td class="then">orchestrator adjudicates: repair inline, park with the user, or NOT-READY as the honest terminal state</td>
+</tr>
+<tr>
+<td class="if">a finding contradicts the spec</td>
+<td class="then">to the USER verbatim with a recommendation — never silently repaired</td>
+</tr>
+<tr>
+<td class="if">all READY with ZERO findings on round 1 of a large or irreversible plan</td>
+<td class="then">suspect the skeptics: tighten briefs (paste rulings, name the diff surface), rerun once; READY-with-minor-findings is a normal first-round outcome and is accepted</td>
+</tr>
+<tr>
+<td class="if">all READY</td>
+<td class="then">commit the plan → execute.setup</td>
+</tr>
+</table>
+</div>
+</div>
+<h2>Execute</h2><div class="phase">
+<div class="state"><h3>execute.setup</h3>
+<p class="q">How many builders edit concurrently, and do they share a filesystem?</p>
+<div class="always">Ledger file (docs/plans/&lt;feature&gt;-ledger.md) exists before the first dispatch.</div>
+<div class="always">Never git stash while worktrees exist.</div>
+<div class="always">Maximize parallelism without mixing work: dispatch every unblocked ticket in the current wave whose files do not overlap, in one message. Serial only on a blocking edge, shared file ownership, or a failed worktree proof. You hire N builders; a builder never hires another builder.</div>
+<table>
+<tr>
+<td class="if">1 builder</td>
+<td class="then">main tree, no worktree → execute.ticket-loop</td>
+</tr>
+<tr>
+<td class="if">2+ builders sharing one checkout (local session, or sub-agents inside ONE cloud VM)</td>
+<td class="then">one worktree per builder (git worktree add &lt;repo&gt;/.cursor/worktrees/&lt;ticket&gt; -b &lt;ticket-branch&gt;; check you are not already inside one; .cursor/worktrees/ gitignored); install dependencies and PROVE each toolchain before dispatch; own ports per tree. Cursor 3.5+ may delete unmanaged worktree dirs (~/.cursor/worktrees/, cursor.worktreeMaxCount); named-branch commits are the preservation. Ledger git_branch from subagentStart (nest hook records it). Janitor inspects git worktree list, not only .cursor/worktrees/&lt;ticket&gt;. → execute.ticket-loop</td>
+</tr>
+<tr>
+<td class="if">each builder is its own cloud agent (separate VM and clone)</td>
+<td class="then">no worktrees — the VM is the isolation; each pushes its own branch, and integration happens by fetching those branches; anything the next role needs must be COMMITTED, since gitignored files do not travel → execute.ticket-loop</td>
+</tr>
+<tr>
+<td class="if">a worktree&#x27;s toolchain proof fails and one repair attempt does not fix it</td>
+<td class="then">collapse the wave to sequential builders in the main tree — never dispatch into a broken tree → execute.ticket-loop</td>
+</tr>
+</table>
+</div>
+<div class="state"><h3>execute.ticket-loop</h3>
+<p class="q">Is there an unblocked ticket?</p>
+<table>
+<tr>
+<td class="if">yes (several independent → parallel, worktree rule applies)</td>
+<td class="then">orchestrator hires one fresh builder per ticket in this wave, all in one message, each with its complete self-contained brief; ledger &#x27;running&#x27; only after dispatch returns an id. Builders do not spawn builders. → execute.review <span class="role r-builder">builder@L2</span></td>
+</tr>
+<tr>
+<td class="if">builder reports BLOCKED on a plan defect (missing file ownership, wrong command)</td>
+<td class="then back">plan.draft — the defect as a planner L1 repair; other tickets keep running</td>
+</tr>
+<tr>
+<td class="if">builder reports BLOCKED for another reason</td>
+<td class="then">resolve or take to the user; re-dispatch</td>
+</tr>
+<tr>
+<td class="if">no tickets remain</td>
+<td class="then">→ execute.integrate</td>
+</tr>
+</table>
+</div>
+<div class="state"><h3>execute.review</h3>
+<p class="q">What does the fresh reviewer say about this ticket&#x27;s diff?</p>
+<div class="always">Builder success reports are never evidence.</div>
+<div class="always">Record the review verdict per ticket into .orchestra/state.json and the ledger.</div>
+<table>
+<tr>
+<td class="if">entry</td>
+<td class="then">fresh reviewer with ticket + diff + builder&#x27;s claimed evidence + trailer <span class="role r-reviewer">reviewer@L2</span></td>
+</tr>
+<tr>
+<td class="if">reviewer flags implausible evidence</td>
+<td class="then">gatekeeper re-proof: that ticket&#x27;s done_when only, honest capture <span class="role r-gatekeeper">gatekeeper:re-proof@L1</span></td>
+</tr>
+<tr>
+<td class="if">PASS</td>
+<td class="then">ledger complete with evidence → execute.ticket-loop</td>
+</tr>
+<tr>
+<td class="if">FINDINGS rounds 1–3</td>
+<td class="then back">execute.ticket-loop — findings to the SAME builder (resume; a fresh builder with the findings history counts when resume is unavailable)</td>
+</tr>
+<tr>
+<td class="if">FINDINGS round 4</td>
+<td class="then">escalation builder with the full findings history <span class="role r-builder">builder-max</span></td>
+</tr>
+<tr>
+<td class="if">FINDINGS round 5</td>
+<td class="then">orchestrator adjudicates: fix decision inline, park in ledger as known issue, or ticket BLOCKED</td>
+</tr>
+<tr>
+<td class="if">ESCALATE: contradicts plan/spec</td>
+<td class="then">to the USER verbatim with a recommendation — never into the loop</td>
+</tr>
+</table>
+</div>
+<div class="state"><h3>execute.integrate</h3>
+<p class="q">Are the wave&#x27;s ticket branches merged into the feature branch?</p>
+<table>
+<tr>
+<td class="if">lone-builder wave (work already on the feature branch)</td>
+<td class="then">→ execute.wave-close</td>
+</tr>
+<tr>
+<td class="if">builders ran as separate cloud agents</td>
+<td class="then">fetch their pushed branches and merge each into the feature branch, ordered by blocking edges — same conflict discipline, remote source</td>
+</tr>
+<tr>
+<td class="if">all reviews PASS</td>
+<td class="then">orchestrator merges each ticket branch into the feature branch in the main tree, ordered by blocking edges; conflicts resolved in daylight — both intents preserved, never --abort, never invented behavior → execute.wave-close</td>
+</tr>
+<tr>
+<td class="if">a conflict is too entangled</td>
+<td class="then">fresh builder as a findings round with both tickets pasted; its diff goes through execute.review before wave close → execute.review <span class="role r-builder">builder@L2</span></td>
+</tr>
+</table>
+</div>
+<div class="state"><h3>execute.wave-close</h3>
+<p class="match">match: all</p>
+<div class="always">Rewrite docs/orchestra/STATE.md (stamped).</div>
+<table>
+<tr>
+<td class="if">worktrees exist or the batch spanned 2+ tickets</td>
+<td class="then">janitor: directory inspection (rescue-or-remove), memory draft from the pasted ledger excerpt, process-adherence checklist (every ticket has a review verdict in state.json; no unmerged ticket branches; redteam record present); orchestrator executes removals and commits the memory draft in this batch-closing commit <span class="role r-janitor">janitor@L2</span></td>
+</tr>
+<tr>
+<td class="if">single-ticket batch, no worktrees</td>
+<td class="then">orchestrator writes the memory line itself in the batch-closing commit</td>
+</tr>
+<tr>
+<td class="if">first wave of the feature and the repo lands via PRs/MRs (delivery.landing != &#x27;direct&#x27;)</td>
+<td class="then">open a DRAFT PR/MR now with the provider&#x27;s CLI — early, cheap, never a blocker; evidence-so-far in the body <span class="role r-releaser">releaser@L1</span></td>
+</tr>
+<tr>
+<td class="if">always (last step)</td>
+<td class="then">→ gates.fast</td>
+</tr>
+</table>
+</div>
+</div>
+<h2>Gates &amp; audit</h2><div class="phase">
+<div class="state gate"><h3>gates.fast</h3>
+<p class="q">Does the fast set pass at the post-merge, post-memory HEAD?</p>
+<div class="always">The orchestrator derives or approves the file→spec mapping and pastes the exact command list — scoping is never the gatekeeper&#x27;s guess.</div>
+<div class="always">Record the report into .orchestra/state.json under gates.reports keyed by commit hash, and on green set gates.last_green_hash to that hash — the hook reads exactly this key.</div>
+<div class="always">Widening is mechanical, not judgment: a diff touching dependency manifests, build/tsconfig, migrations/schema, shared types/tokens, or auth widens the scoped set.</div>
+<table>
+<tr>
+<td class="if">entry</td>
+<td class="then">fast set at HEAD: lint + typecheck + scoped unit + smoke core + framework doctor (per the repo&#x27;s verified tooling list, e.g. React Doctor on React repos) + scoped e2e when a user-facing flow changed (isolated port) <span class="role r-gatekeeper">gatekeeper:fast@L2</span></td>
+</tr>
+<tr>
+<td class="if">FAIL</td>
+<td class="then back">execute.ticket-loop — the failing gate excerpt as findings to a lone builder in the main tree; re-run the set after — skip the wave-close always-batch on gate-repair re-entry</td>
+</tr>
+<tr>
+<td class="if">FLAKY</td>
+<td class="then">quarantine ledger in state.json: first occurrence → ship allowed + flake ticketed; second occurrence of the same flake → mandatory fix ticket before that surface merges again; no per-flake user question after the first</td>
+</tr>
+<tr>
+<td class="if">green and more waves remain</td>
+<td class="then">→ execute.setup</td>
+</tr>
+<tr>
+<td class="if">green and the feature is complete</td>
+<td class="then">→ review.pr</td>
+</tr>
+</table>
+</div>
+<div class="state"><h3>review.pr</h3>
+<p class="match">match: first</p>
+<p class="q">Does the inclusive whole-PR (or whole-branch) review pass — no Critical or Major — before merge?</p>
+<div class="always">Pin the merge-base or the open PR diff. Small diffs pasted; large diffs passed as the pinned command + file list. Runs on PR-landing and on direct-landing (branch diff) alike — hosted Bugbot/Copilot/CodeRabbit on a remote PR are extra, not a substitute.</div>
+<div class="always">Record the verdict (CLEAN or BLOCKED + worst severity) in the ledger and .orchestra/state.json. Nits/Trivial never block merge. This does not replace the gatekeeper or the per-ticket reviewer.</div>
+<table>
+<tr>
+<td class="if">entry</td>
+<td class="then">dispatch one pr-reviewer on the whole change about to merge <span class="role r-reviewer">pr-reviewer@L2</span></td>
+</tr>
+<tr>
+<td class="if">BLOCKED (Critical or Major) and the run is the small lane</td>
+<td class="then back">small.build — the ranked Critical/Major findings as a findings round</td>
+</tr>
+<tr>
+<td class="if">BLOCKED (Critical or Major)</td>
+<td class="then back">execute.ticket-loop — the ranked Critical/Major findings as a findings round to a lone builder in the main tree</td>
+</tr>
+<tr>
+<td class="if">CLEAN or nits-only and the run is the small lane and the repo lands via PRs</td>
+<td class="then">→ release.merge</td>
+</tr>
+<tr>
+<td class="if">CLEAN or nits-only and the run is the small lane</td>
+<td class="then">→ terminal.done</td>
+</tr>
+<tr>
+<td class="if">CLEAN or nits-only</td>
+<td class="then">→ audit.decide</td>
+</tr>
+</table>
+</div>
+<div class="state"><h3>audit.decide</h3>
+<p class="q">Does this change-set need the two-axis audit before release?</p>
+<table>
+<tr>
+<td class="if">the batch closed with 2+ tickets, or the user asks</td>
+<td class="then">→ audit.run</td>
+</tr>
+<tr>
+<td class="if">single-ticket run (the reviewer already saw the whole diff)</td>
+<td class="then">→ release.merge</td>
+</tr>
+</table>
+</div>
+<div class="state"><h3>audit.run</h3>
+<p class="q">What do the two axes report?</p>
+<div class="always">Reports are presented verbatim, never merged — separation prevents one axis masking the other.</div>
+<table>
+<tr>
+<td class="if">entry</td>
+<td class="then">auditor(standards) + auditor(spec) in parallel; small diffs pasted, large diffs passed as the pinned command + file list <span class="role r-auditor">auditor:standards@L2</span><span class="role r-auditor">auditor:spec@L2</span></td>
+</tr>
+<tr>
+<td class="if">a finding contradicts the spec</td>
+<td class="then">to the USER verbatim</td>
+</tr>
+<tr>
+<td class="if">findings on executed work</td>
+<td class="then back">execute.ticket-loop — verified findings as a findings round; re-audit the touched surface after</td>
+</tr>
+<tr>
+<td class="if">standalone review request (entered from intake)</td>
+<td class="then">present both reports with per-axis worst-issue lines; END — no gates, no release, no push → terminal.done</td>
+</tr>
+<tr>
+<td class="if">both CLEAN or user accepts residuals (chain run)</td>
+<td class="then">→ release.merge</td>
+</tr>
+</table>
+</div>
+</div>
+<h2>Release</h2><div class="phase">
+<div class="state gate"><h3>release.merge</h3>
+<p class="q">Who gates the merge — the host (server_side_gate) or the local hash record — and can the gated hash be the shipped hash?</p>
+<div class="always">Read the repo&#x27;s delivery declaration (AGENTS.md &#x27;Delivery&#x27; slot + .orchestra/delivery.json): provider, protected branches, landing rule, server_side_gate, deploy policy. Use that provider&#x27;s CLI (github: gh · azure-devops: az repos · gitlab: glab · plain-git: git). server_side_gate is true only when a host branch policy actually runs the fast set — do not infer it from an Azure remote URL alone.</div>
+<div class="always">Hook floor: force-push/stash/rebase/hard-reset are deny. Protected-branch landings and declared deploys ask in a local IDE; ask degrades to deny when headless. Ask is not the merge approval of record — the host branch policy is, when server_side_gate is true; otherwise the local hash check denies protected landings while gates.last_green_hash ≠ HEAD.</div>
+<table>
+<tr>
+<td class="if">server_side_gate true (e.g. Azure DevOps branch policy with build validation)</td>
+<td class="then">make sure the host&#x27;s required checks match the fast set; mark the PR ready and set auto-complete — the platform gates and merges the preview merge commit, so the gated hash is provably the shipped hash <span class="role r-releaser">releaser@L2</span></td>
+</tr>
+<tr>
+<td class="if">no server-side gate, fast-gate green at HEAD, branch current with the target</td>
+<td class="then">mark the PR ready with the final gate report; merge fast-forward so the gated hash becomes the target HEAD <span class="role r-releaser">releaser@L2</span></td>
+</tr>
+<tr>
+<td class="if">no server-side gate and the branch is behind the target</td>
+<td class="then">merge the target INTO the feature branch (agent-run rebases are blocked by the guardrail), re-run the fast set, then fast-forward <span class="role r-releaser">releaser@L2</span><span class="role r-gatekeeper">gatekeeper:fast@L1</span></td>
+</tr>
+<tr>
+<td class="if">fast-forward impractical</td>
+<td class="then">merge, then auto re-run the fast set at the target HEAD (mechanical, non-approval); only that green releases a deploy <span class="role r-releaser">releaser@L2</span><span class="role r-gatekeeper">gatekeeper:fast@L1</span></td>
+</tr>
+<tr>
+<td class="if">no server-side gate and HEAD moved past the gate record (mechanical check: `git diff --stat &lt;gate-hash&gt;..HEAD -- &#x27;:!docs&#x27; &#x27;:!*.md&#x27;` non-empty)</td>
+<td class="then back">gates.fast — stale-gate: re-run at current HEAD; docs/memory-only commits do NOT void a gate</td>
+</tr>
+<tr>
+<td class="if">merge done and deploy policy is &#x27;auto&#x27; for this repo/environment AND the diff contains no migrations/schema changes</td>
+<td class="then">→ release.deploy</td>
+</tr>
+<tr>
+<td class="if">merge done, deploy gated (production default, or migrations present)</td>
+<td class="then">releaser stages the deploy and pauses: NEEDS-APPROVAL with exact command + blast radius; spec-axis audit must be green before a production deploy. On Azure DevOps, a Pipelines environment approval check is the natural home for this pause — say so when one exists → release.deploy <span class="role r-releaser">releaser@L2</span></td>
+</tr>
+<tr>
+<td class="if">merge done and no deploy is configured or in scope for this change</td>
+<td class="then">→ cleanup.final</td>
+</tr>
+</table>
+</div>
+<div class="state gate"><h3>release.deploy</h3>
+<p class="q">Did the deploy verify?</p>
+<table>
+<tr>
+<td class="if">gated and the user approves in chat</td>
+<td class="then">re-dispatch the releaser with the authorization block (USER APPROVED IN CHAT verbatim + EXECUTE EXACTLY); hook ask is a local-IDE tripwire, not the approval of record <span class="role r-releaser">releaser@L2</span></td>
+</tr>
+<tr>
+<td class="if">deploy executed</td>
+<td class="then">verify the health check and record evidence</td>
+</tr>
+<tr>
+<td class="if">health check fails, or main breaks after merge</td>
+<td class="then">→ release.rollback</td>
+</tr>
+<tr>
+<td class="if">verified, or user defers the deploy (record &#x27;deferred:&#x27; in STATE.md — it survives the idle reset)</td>
+<td class="then">→ cleanup.final</td>
+</tr>
+</table>
+</div>
+<div class="state gate"><h3>release.rollback</h3>
+<div class="always">Revert first, diagnose second — restoring the last gated state is auto-executable because it restores a proven hash.</div>
+<table>
+<tr>
+<td class="if">entry</td>
+<td class="then">releaser stages the revert of the merge commit; execute; verify the health check at the reverted state <span class="role r-releaser">releaser@L2</span></td>
+</tr>
+<tr>
+<td class="if">reverted and verified</td>
+<td class="then back">bug.feedback-loop — the failure evidence as the bug to diagnose</td>
+</tr>
+</table>
+</div>
+</div>
+<h2>Full suite &amp; bug</h2><div class="phase">
+<div class="state"><h3>fullsuite.run</h3>
+<p class="q">User-triggered full verification — never on the critical path.</p>
+<div class="always">Never blocks a PR, a merge, or a deploy. Runs whole-codebase, on main, in a quiet worktree or a Cursor cloud agent.</div>
+<table>
+<tr>
+<td class="if">entry</td>
+<td class="then">full suite; results appended to docs/orchestra/STATE.md pointers and reported <span class="role r-gatekeeper">gatekeeper:full@L3</span></td>
+</tr>
+<tr>
+<td class="if">failures found</td>
+<td class="then">each failure becomes an intake item (bug lane), prioritized with the user → terminal.done</td>
+</tr>
+<tr>
+<td class="if">clean</td>
+<td class="then">→ terminal.done</td>
+</tr>
+</table>
+</div>
+<div class="state"><h3>bug.feedback-loop</h3>
+<p class="q">Does a named, already-run, red-capable, fast, deterministic command reproduce it?</p>
+<table>
+<tr>
+<td class="if">no loop yet</td>
+<td class="then">build one (failing test &gt; curl &gt; CLI diff &gt; headless browser &gt; bisect harness); non-deterministic → raise and state the reproduction rate first; perf → measured baseline before any change; no loop possible → stop and ask the user</td>
+</tr>
+<tr>
+<td class="if">loop exists</td>
+<td class="then">minimise; 3–5 ranked falsifiable hypotheses shown to the user (non-blocking); instrument one variable at a time; fix = one ticket through the execute machinery with the regression test first → execute.setup</td>
+</tr>
+<tr>
+<td class="if">fix verified and diff is trivial</td>
+<td class="then">clean instrumentation; winning hypothesis in the commit message → terminal.done</td>
+</tr>
+</table>
+</div>
+</div>
+<h2>Cleanup &amp; terminal</h2><div class="phase">
+<div class="state"><h3>cleanup.final</h3>
+<table>
+<tr>
+<td class="if">always</td>
+<td class="then">close any open batch (worktrees inspected/removed, memory committed); verify zero live worktrees, ledger CLOSED, STATE.md rewritten to idle (keeping any &#x27;deferred:&#x27; line); expired RESEARCH.md removed → terminal.done</td>
+</tr>
+</table>
+</div>
+<div class="state"><h3>terminal.done</h3>
+<table>
+<tr>
+<td class="if">declaring DONE</td>
+<td class="then">quote the evidence (commands + exit codes + hashes); when a run/ledger was opened, cleanup.final must have run; standalone reviews, full-suite runs, trivial changes, and pure answers declare DONE with evidence alone</td>
+</tr>
+<tr>
+<td class="if">anything blocked/deferred</td>
+<td class="then">name it honestly; never dress one terminal state as another</td>
+</tr>
+</table>
+</div>
+</div>
+<h2>Autonomy</h2><div class="phase">
+<div class="state"><h3>autonomy.loop</h3>
+<p class="q">Unattended mode: is there an unfinished ledger item and budget left?</p>
+<div class="always">A ledger file (docs/plans/&lt;feature&gt;-ledger.md, or the path STATE.md points at) must exist; otherwise NOT-READY — autonomy cannot start without a plan.</div>
+<div class="always">Never invent work: the loop only advances items already in the plan&#x27;s ledger. New scope stops the loop and goes to the user.</div>
+<div class="always">Each pass is a fresh dispatch through the normal chain (execute.ticket-loop → execute.review → gates.fast); autonomy changes WHO decides to continue, never WHAT the roles do.</div>
+<div class="always">A ledger item flips to done only on evidence (command + exit code). Flipping without evidence is the one tamper rule.</div>
+<table>
+<tr>
+<td class="if">no ledger file exists</td>
+<td class="then">NOT-READY — leave this state; autonomy cannot start without a plan</td>
+</tr>
+<tr>
+<td class="if">entry</td>
+<td class="then">record the caps the user set: max passes, max consecutive no-progress passes (default 2), token/time budget, and the approval boundaries that halt the loop</td>
+</tr>
+<tr>
+<td class="if">an unblocked ledger item remains and caps are not hit</td>
+<td class="then">run one pass through the normal chain, record the result, loop ↻ autonomy.loop</td>
+</tr>
+<tr>
+<td class="if">two consecutive passes produce no new completed item, or the same failure signature repeats</td>
+<td class="then">STALLED — stop and report; a loop that is not converging burns budget without learning</td>
+</tr>
+<tr>
+<td class="if">a pass needs a gated action (deploy, external send, schema change)</td>
+<td class="then">NEEDS-APPROVAL — halt the loop and surface it; the loop never approves on the user&#x27;s behalf</td>
+</tr>
+<tr>
+<td class="if">a finding contradicts the plan or spec, or new scope appears</td>
+<td class="then">stop and take it to the user — autonomy is permission to work, not permission to redesign</td>
+</tr>
+<tr>
+<td class="if">caps hit</td>
+<td class="then">EXHAUSTED — report what completed, what remains, and the next action</td>
+</tr>
+<tr>
+<td class="if">every ledger item is done</td>
+<td class="then">→ review.pr</td>
+</tr>
+</table>
+</div>
+</div>
+<h2>Interrupts</h2><div class="phase"><div class="state"><table>
+<tr><td class="if">user changes a ruling mid-run</td><td class="then">back to design.gate: record the resume point (ledger + STATE.md); settle in-flight dispatches per the ledger; architect L1 revision of the spec carrying the new ruling verbatim -&gt; design.gate for approval; then planner Repair scoped to the affected tickets only -&gt; plan.redteam re-dispatching ONLY the touched lenses; then re-enter execute.ticket-loop at the recorded resume point</td></tr>
+<tr><td class="if">user interrupt during execution</td><td class="then">stop dispatching; report ledger state; resume from the ledger — never re-dispatch blind (two builders on one ticket in one tree is corruption)</td></tr>
+<tr><td class="if">a dispatch errors or never returns</td><td class="then">check the ledger and tree for partial commits, then dispatch fresh; liveness for background agents = state file + mtime at the verified sub-agent state path</td></tr>
+</table></div></div>
+<h2>Running in the cloud</h2><div class="phase"><div class="state"><table>
+<tr><td class="if">topology</td><td class="then">DEFAULT (A): one cloud agent IS the orchestrator; its sub-agents are children inside that same VM, sharing one clone. Everything in this graph applies unchanged. ALTERNATIVE (B): one cloud agent per independent FEATURE or ticket, each running its own mini-chain and returning a PR. Never split ROLES across VMs — roles are coupled by handoffs, and every boundary would become a git round-trip.</td></tr>
+<tr><td class="if">worktrees</td><td class="then">Topology A: sub-agents share the VM&#x27;s single clone and single git index, so the local rule applies unchanged — 2+ concurrent builders get worktrees inside the VM. Topology B: each VM is already an isolated clone; no worktrees.</td></tr>
+<tr><td class="if">handoff</td><td class="then">Topology A: briefs + shared disk, as local. Topology B: nothing but git (pushed branches) and the orchestrator relaying report text — anything load-bearing must be committed, because gitignored files do not exist in a fresh clone.</td></tr>
+<tr><td class="if">conversation</td><td class="then">A cloud orchestrator cannot hold a live conversation; it reaches the user asynchronously (Slack, web, PR comments). Design and plan are conversations — run them locally. Execute waves are the natural cloud workload.</td></tr>
+<tr><td class="if">enforcement</td><td class="then">In cloud, `ask` is undefined behavior (cloud agents auto-run commands), so the hook degrades ask -&gt; DENY when headless. .orchestra/state.json is gitignored and therefore absent from a fresh clone: a protected landing with no readable gate record is DENIED in cloud. The correct cloud answer is server_side_gate — set it only when a host branch policy actually runs the fast set; do not default it true for every Azure remote. Host-mediated landings stay allowed; direct pushes to protected branches never do. Hooks also do not run during a cloud agent&#x27;s early read-only turns. Seed state.json from docs/orchestra/state.example.json when missing.</td></tr>
+<tr><td class="if">config</td><td class="then">Repo-level config travels with the clone (.cursor/agents, .cursor/skills, .cursor/hooks.json, AGENTS.md). User-level config (~/.cursor/*) does NOT. Keep this package project-scoped.</td></tr>
+</table></div></div>
+<h2>Invariants</h2><div class="inv"><ul>
+<li>Sub-agent briefs are self-contained: verbatim-critical excerpts (rulings, done_when, path rules) pasted; bulk material passed as pointers the agent reads itself.</li>
+<li>Sub-agents never spawn sub-agents, including more of their own role (policy; subagentStart hook denies it). All fan-out is the orchestrator&#x27;s: N concurrent instances of one role per wave, as the plan names.</li>
+<li>User rulings travel verbatim — full quote only when it fits one line, else pointer; never a trimmed quote.</li>
+<li>Evidence = command + exit code (captured without pipes) or both-theme screenshots; assertions are not evidence.</li>
+<li>Worktrees only for 2+ concurrent editors; created, integrated, and removed by the orchestrator within the wave.</li>
+<li>Judgement roles (architect, planner, red-teamer, auditor, builder-max, pr-reviewer) run model: inherit — the ceiling; the rest are pinned lower at install (install.sh verifies).</li>
+<li>Approval boundaries: destructive git is deny; protected landings ask locally and deny when headless; host branch policy is the merge gate of record when server_side_gate is true; files never authorize.</li>
+<li>Memory lands in the batch-closing commit; stale entries are pruned, not superseded-in-place.</li>
+<li>Honest terminal states — DONE, BLOCKED, NOT-READY, NEEDS-APPROVAL; never one dressed as another.</li>
+<li>Every transition announced: `flow: &lt;from&gt; -&gt; &lt;to&gt; (&lt;matched if&gt;)`.</li>
 </ul></div>
-</div></body>
-</html>
+</div></body></html>
