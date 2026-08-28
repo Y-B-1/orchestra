@@ -251,19 +251,24 @@ if grep -q 'Delivery: <declare' AGENTS.md 2>/dev/null; then
 fi
 if [ ! -f .orchestra/delivery.json ]; then
   mkdir -p .orchestra
-  remote=$(git config --get remote.origin.url 2>/dev/null || echo "")
-  case "$remote" in
-    *github.com*)                      provider=github;       ssg=false ;;
-    *dev.azure.com*|*visualstudio.com*) provider=azure-devops; ssg=false ;;
-    *gitlab*)                          provider=gitlab;       ssg=false ;;
-    "")                                provider=plain-git;    ssg=false ;;
-    *)                                 provider=plain-git;    ssg=false ;;
-  esac
+  urls=$(git remote -v 2>/dev/null | awk '{print $2}' | tr '[:upper:]' '[:lower:]')
+  # Dual-remote hosts (GitHub origin + Azure devops): Azure is the land path.
+  if echo "$urls" | grep -Eq 'dev\.azure\.com|visualstudio\.com'; then
+    provider=azure-devops; ssg=false
+    echo "$urls" | grep -Eq 'github\.com' && \
+      say "note: GitHub and Azure remotes both present — defaulting provider to azure-devops (edit delivery.json if GitHub is the gate of record)"
+  elif echo "$urls" | grep -Eq 'github\.com'; then
+    provider=github; ssg=false
+  elif echo "$urls" | grep -Eq 'gitlab'; then
+    provider=gitlab; ssg=false
+  else
+    provider=plain-git; ssg=false
+  fi
   branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)
   [ "$provider" = plain-git ] && landing=direct || landing=pr
   printf '{\n  "provider": "%s",\n  "protected_branches": ["%s"],\n  "landing": "%s",\n  "server_side_gate": %s,\n  "deploy": { "production": "approval" },\n  "deploy_commands": []\n}\n' \
     "$provider" "$branch" "$landing" "$ssg" > .orchestra/delivery.json
-  say "wrote .orchestra/delivery.json — detected provider: $provider (remote: ${remote:-none})"
+  say "wrote .orchestra/delivery.json — detected provider: $provider"
   say "  EDIT IT: confirm protected branches, set deploy policy per environment, list deploy_commands"
   say "  server_side_gate defaults to false. Set true ONLY if a host branch policy already runs the fast set."
   [ "$provider" = azure-devops ] && say "  Azure: a branch policy with build validation is the recommended cloud gate — create it, then set server_side_gate true"

@@ -2,7 +2,7 @@
 
 A multi-agent operating system for Cursor: thirteen sub-agent roles, a machine-validated routing graph with three work lanes, deterministic guardrail hooks, bounded working memory, and a verified **merge-mode** installer — the charge chain (design → plan → execute → audit → gates → pr-review → release → cleanup) translated into Cursor's native mechanisms.
 
-The original Claude snapshot is frozen at the sibling folder `orchestra-roster`. **All improvements live only in this copy** (`orchestra-roster-next`).
+The original Claude snapshot is frozen at the sibling folder `orchestra-roster`. **All improvements live in this package** (GitHub: `Y-B-1/orchestra`).
 
 ## What's in the box
 
@@ -35,7 +35,7 @@ The **orchestrator is the main session** — the only entity that talks to the u
 From the **host** repo root:
 
 ```bash
-bash /path/to/orchestra-roster-next/install.sh
+bash /path/to/orchestra/install.sh
 ```
 
 That copies orchestra agents, orchestra skills, the router rule, and orchestra hook scripts; **upserts** orchestra entries in `.cursor/hooks.json` without removing host hooks; creates `AGENTS.md` / `docs/AGENT-MEMORY.md` from frameworks only when missing; appends a `## Orchestra` block when that heading is absent. It will **not** overwrite a filled host `AGENTS.md`, extra skills (for example react-doctor), or non-orchestra hook entries.
@@ -44,7 +44,13 @@ That copies orchestra agents, orchestra skills, the router rule, and orchestra h
 
 Then fill the **Delivery** slot in `AGENTS.md` from `.orchestra/delivery.json`. A leftover `<declare…>` placeholder is a note, not an install failure, once `delivery.json` exists.
 
+**On GitHub** the same shape: required checks matching the fast set, then `server_side_gate: true`. Draft PRs, mark ready, merge with the host policy as the gate of record.
+
 **On Azure DevOps** the recommended shape: a **branch policy on `main` with build validation** running the same fast set, then `server_side_gate: true`. Install defaults `server_side_gate` to **false** even for Azure remotes — set it true only after that policy exists. PRs as drafts, mark ready with **auto-complete**, full suite as its own scheduled pipeline on main. Production deploys belong behind a Pipelines **environment approval check**.
+
+A host with **both** remotes (GitHub `origin` plus Azure `devops`) is the Equiti Hub pattern. Install then prefers `azure-devops` as `provider` because Azure is the land path; edit `delivery.json` if GitHub should be the gate of record instead. The hook already tokenizes `git`, `gh`, and `az repos`.
+
+This package is **Cursor-only**. A Claude Code port would be a second agent runtime (`.claude/agents`, different hooks) and is out of scope.
 
 Naive `cp -R` of this folder over a living host (for example a repo that already has its own `AGENTS.md` and `hooks.json`) will clobber that host. Use `install.sh`.
 

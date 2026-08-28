@@ -42,12 +42,13 @@ history.
 
 ## Delivery
 
-Delivery: GitHub (`Y-B-1/orchestra-roster-next`); `main` is protected; landing is
-direct; no product deploy. Host repos replace this line. See `.orchestra/delivery.json`.
+Delivery: GitHub (`Y-B-1/orchestra`); `main` is protected; landing is
+direct; no product deploy. Hosts on Azure DevOps or GitHub set `provider` in
+`.orchestra/delivery.json` (`gh` or `az repos`). Host repos replace this line.
 
 ## Project rails (optional)
 
-- Work only in this copy (`orchestra-roster-next`). The sibling
+- Work in this package (GitHub: `Y-B-1/orchestra`). The sibling
   `orchestra-roster` folder is a frozen Claude snapshot — do not edit it.
 - Keep the original twelve worker roles until the parked agent-count discussion
   reopens. `pr-reviewer` was added by request (inclusive pre-merge review) —

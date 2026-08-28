@@ -18,7 +18,7 @@
 
 ## Current
 
-- **snapshot** · sibling `../orchestra-roster` · 2026-08-28 · Frozen Claude original; all improvements live only in `orchestra-roster-next`.
+- **snapshot** · sibling `../orchestra-roster` · 2026-08-28 · Frozen Claude original; living package is GitHub `Y-B-1/orchestra`.
 - **charter** · `AGENTS.md`, `docs/AGENT-MEMORY.md` · 2026-08-28 · These are fill-in frameworks (headings + how-to-fill), not a forced constitution; janitor + `sessionStart` heal steward them; never clobber a host's filled slots.
 - **identity** · `.cursor/skills/orchestrator/SKILL.md` · 2026-08-28 · "You are the Orchestrator" belongs only in the orchestrator skill (main session). `AGENTS.md` alwaysApply must not inject that identity into workers.
 - **parked** · agent-count / target roster · 2026-08-28 · Folding janitor/releaser/researcher/builder-max is still paused. `pr-reviewer` was added by request (13th worker); do not treat that as a license to fold the original twelve.
