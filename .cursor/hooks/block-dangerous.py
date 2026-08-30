@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
-"""Cursor beforeShellExecution hook: the deterministic floor.
+"""Guardrail hook: Cursor beforeShellExecution and Claude PreToolUse (Bash).
 
-Denies destructive commands; asks (Cursor surfaces the approval to the real user)
-on pushes/merges to protected branches — plain git, gh, az repos, glab — and on
-deploy commands declared in .orchestra/delivery.json; denies protected landings while
-the recorded green-gate hash differs from HEAD, unless the host enforces the gate
-itself (delivery.json "server_side_gate": true).
+Detects the harness from the payload (or ORCHESTRA_HOOK_RUNTIME=claude).
+
+Denies destructive commands. Never returns ask (no human click). Protected-branch
+landings (plain git, gh, az repos, glab) and declared deploy commands are allow
+only when pr-reviewer CLEAN is recorded in state.json (reviews.pr) together with a
+matching gates.last_green_hash — including headless (ralph / overnight). Otherwise
+deny. server_side_gate true allows host-mediated PR completion. Denies protected
+landings while the recorded green-gate hash differs from HEAD, unless the host
+enforces the gate itself.
+
+Host never-merge rails (block-pr-merge.sh) are stripped at install. Full e2e is not
+a merge precondition.
 
 Honest contract: this is a tripwire against accidents and first-order drift, not a
-wall against adversarial evasion. Local IDE `ask` is a pause, not the merge
-approval of record (cloud/headless degrades ask to deny; host branch policy is
-the gate when server_side_gate is true). Fails OPEN on parse surprises so a hook
-bug cannot brick the session — but every fail-open appends to
+wall against adversarial evasion. Fails OPEN on parse surprises so a hook bug
+cannot brick the session — but every fail-open appends to
 .orchestra/hook-failures.log, which sessionStart and the janitor surface.
 Pair with failClosed: true so crash/timeout/invalid JSON blocks the command.
 """
@@ -33,12 +38,10 @@ def log_failure(note):
 
 
 def headless():
-    """True when no human can answer a permission prompt (cloud agent / CI).
+    """True in cloud agent / CI. The hook never returns ask; headless still
+    matters for gate_fresh fail-closed when state.json is missing.
 
-    Cursor's docs do not define `ask` semantics for cloud agents, and cloud agents
-    auto-run terminal commands — so an `ask` there may simply pass. When we cannot
-    confirm a human is present, `ask` degrades to `deny`. Override explicitly with
-    "headless": true|false in .orchestra/delivery.json.
+    Override explicitly with "headless": true|false in .orchestra/delivery.json.
     """
     declared = delivery().get("headless", "auto")
     if declared is not True and declared is not False:
@@ -48,23 +51,56 @@ def headless():
     return declared
 
 
+RUNTIME = ["cursor"]
+
+
+def is_claude_payload(payload):
+    return bool(
+        payload.get("hook_event_name")
+        or payload.get("hookEventName")
+        or payload.get("tool_input")
+        or os.environ.get("ORCHESTRA_HOOK_RUNTIME") == "claude"
+    )
+
+
 def respond(permission, reason=None):
-    if permission == "ask" and headless():
+    if permission == "ask":
+        # Belt: this hook must never surface a human click.
         permission = "deny"
-        reason = (f"{reason} — no human can answer a prompt here (cloud/CI). "
-                  "Let the host's branch policy land it, or run this from a session with a person in it")
+        reason = (f"{reason} — Orchestra does not ask; land/deploy requires "
+                  "pr-reviewer CLEAN + matching last_green_hash")
+    if RUNTIME[0] == "claude":
+        decision = "allow" if permission == "allow" else "deny"
+        out = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": decision,
+            }
+        }
+        if reason:
+            out["hookSpecificOutput"]["permissionDecisionReason"] = (
+                f"Orchestra guardrail [{decision}]: {reason}"
+            )
+        print(json.dumps(out))
+        sys.exit(0)
     out = {"permission": permission}
     if reason:
         out["user_message"] = f"Orchestra guardrail [{permission}]: {reason}"
         out["agent_message"] = (f"The orchestra guardrail hook returned '{permission}' ({reason}). "
-                                "Do not retry variants; follow the release process or ask the user.")
+                                "Do not retry variants; follow the release process.")
     print(json.dumps(out))
     sys.exit(0)
 
 
 try:
     payload = json.load(sys.stdin)
-    cmd = payload.get("command", "") or ""
+    if is_claude_payload(payload):
+        RUNTIME[0] = "claude"
+    cmd = (
+        payload.get("command")
+        or (payload.get("tool_input") or {}).get("command")
+        or ""
+    )
 except Exception:
     log_failure("stdin parse failure")
     respond("allow")
@@ -91,6 +127,14 @@ def current_branch():
         return ""
 
 
+def load_state():
+    try:
+        with open(".orchestra/state.json") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
 def gate_fresh():
     """True when state.json records a green gate at the current HEAD (or check impossible).
 
@@ -101,10 +145,8 @@ def gate_fresh():
     if delivery().get("server_side_gate"):
         return None
     try:
-        try:
-            with open(".orchestra/state.json") as f:
-                state = json.load(f)
-        except FileNotFoundError:
+        state = load_state()
+        if state is None:
             return False if headless() else None
         gate = (state.get("gates") or {}).get("last_green_hash", "")
         if not gate:
@@ -117,6 +159,18 @@ def gate_fresh():
         return head.startswith(gate) or gate.startswith(head)
     except Exception:
         return None
+
+
+def pr_review_authorized():
+    """pr-reviewer CLEAN + fast-gate hash at HEAD is merge authorization.
+
+    The releaser may land (including headless / ralph). Full e2e is not a
+    precondition. Direct force-push stays deny regardless.
+    """
+    if gate_fresh() is not True:
+        return False
+    state = load_state() or {}
+    return (state.get("reviews") or {}).get("pr") == "CLEAN"
 
 
 def analyze_git(tokens):
@@ -133,7 +187,7 @@ def analyze_git(tokens):
 
 
 def check_tokens(tokens):
-    """Deny/ask rules over one command's tokens. Recurses into interpreter -c strings."""
+    """Deny/allow rules over one command's tokens. Recurses into interpreter -c strings."""
     # Strip wrapper layers to a fixpoint: VAR= assignments, sudo/command/env/nohup,
     # and env's own short flags — so `sudo env CI=1 git push -f` still classifies.
     while tokens:
@@ -153,11 +207,13 @@ def check_tokens(tokens):
 
     prog = os.path.basename(tokens[0])
 
-    # Deploy commands declared per repo get a user-facing ask.
+    # Deploy commands declared per repo: CLEAN+fresh allows; otherwise deny.
     for pat in delivery().get("deploy_commands", []):
         try:
             if re.search(pat, " ".join(tokens)):
-                respond("ask", f"declared deploy command ({pat})")
+                if pr_review_authorized():
+                    respond("allow")
+                respond("deny", f"declared deploy command ({pat}) without pr-reviewer CLEAN + matching gate hash")
         except re.error:
             log_failure(f"bad deploy_commands pattern: {pat}")
 
@@ -178,14 +234,14 @@ def check_tokens(tokens):
             # That is a stronger gate than ours, and it is the recommended cloud path,
             # so it stays allowed even headless. Direct pushes below do NOT get this.
             if delivery().get("server_side_gate"):
-                if headless():
-                    respond("allow")
-                respond("ask", f"landing a PR/MR via {prog} (the host's branch policy is the gate)")
+                respond("allow")
             if gate_fresh() is False:
                 respond("deny", "PR/MR completion while the recorded green-gate hash differs from "
                                 "HEAD — re-run the fast gate first, or enable server_side_gate and "
                                 "let the host's branch policy be the gate of record")
-            respond("ask", f"landing a PR/MR on a protected branch via {prog}")
+            if pr_review_authorized():
+                respond("allow")
+            respond("deny", f"landing a PR/MR via {prog} without pr-reviewer CLEAN + matching gate hash")
         return
 
     if prog in ("sh", "bash", "zsh", "dash", "ksh", "python", "python3", "node") :
@@ -214,9 +270,18 @@ def check_tokens(tokens):
                 if fresh is False:
                     respond("deny", "push to protected branch while the recorded green-gate hash "
                                     "differs from HEAD — re-run the fast gate first")
-                respond("ask", f"push to protected branch ({', '.join(sorted(targets & PROTECTED))})")
+            if pr_review_authorized():
+                respond("allow")
+            respond("deny", f"push to protected branch ({', '.join(sorted(targets & PROTECTED))}) "
+                            "without pr-reviewer CLEAN + matching gate hash")
         elif sub == "merge" and current_branch() in PROTECTED:
-            respond("ask", f"merge into protected branch ({current_branch()})")
+            if gate_fresh() is False:
+                respond("deny", "merge into protected branch while the recorded green-gate hash "
+                                "differs from HEAD — re-run the fast gate first")
+            if pr_review_authorized():
+                respond("allow")
+            respond("deny", f"merge into protected branch ({current_branch()}) "
+                            "without pr-reviewer CLEAN + matching gate hash")
         elif sub == "reset" and "--hard" in flags:
             respond("deny", "hard reset discards work")
         elif sub == "clean" and ("--force" in flags or "f" in short):

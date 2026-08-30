@@ -17,5 +17,5 @@ You coordinate; `pr-reviewer` reviews. Brief: `briefs.md#pr-reviewer`.
 1. Pin the merge-base / PR diff command. Paste a small diff; pass a pinned command + file list when large.
 2. Dispatch one `pr-reviewer@L2` (L1 only for tiny small-lane diffs).
 3. **BLOCKED** (Critical/Major) → findings loop (same builder if one ticket; else a ticketed fix). Then re-gate and re-review.
-4. **CLEAN** or nits-only → continue (`audit.decide` on the full chain; `release.merge` on the small lane when the repo lands via PRs; `terminal.done` on the small lane with no PR flow). Record nits in the ledger; janitor may promote accepted preferences into `docs/AGENT-MEMORY.md`.
+4. **CLEAN** or nits-only → record `reviews.pr = "CLEAN"` in `.orchestra/state.json` (the hook reads that key) and continue to `release.merge` (small lane) or `audit.decide` then `release.merge` (full chain). That CLEAN **is** merge and deploy authorization — dispatch the releaser; do not wait for a human. Full e2e is never in this chain.
 5. Nits never block merge. Fast-gate green remains the merge CI requirement.

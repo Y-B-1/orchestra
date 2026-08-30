@@ -1,8 +1,12 @@
-# AGENTS.md — project charter (framework)
+# Project charter (CLAUDE.md)
 
 This file is the **host project's** charter. Orchestra does not own it and must
 not replace a filled copy. Keep every `##` heading. Fill the slots. Delete
 nothing that is already project-specific.
+
+Claude Code reads `CLAUDE.md`. Cursor reads `AGENTS.md`, which **must** be a
+symlink to this file (`ln -sfn CLAUDE.md AGENTS.md`). Never symlink `AGENTS.md`
+to `~/.claude/CLAUDE.md` or any path outside this repo.
 
 A session that finds this file still full of `<angle-bracket slots>` should
 fill them from the repo (README, remotes, existing conventions) — not invent
@@ -39,6 +43,11 @@ Workers are those roles. They are not the orchestrator.
 Routing: `.cursor/skills/orchestrator/flow.json`. Briefs:
 `.cursor/skills/orchestrator/briefs.md`. Do not implement product code when a
 builder can. Evidence is a command plus exit code, not a success report.
+
+This graph is the only process in an Orchestra host. After intake the only
+user-facing stop is unanswered frontier questions. Specs, plans, reviews,
+merges, and deploys do not wait. Maximize parallel waves. Claude workers
+live in `.claude/agents/`; do not add `.claude/skills/orchestrator/`.
 
 If this heading is missing, the heal hook appends this section. It will not
 touch **Who you are**, **Memory**, **Delivery**, or **Project rails**.

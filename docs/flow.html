@@ -69,17 +69,18 @@
 <div class="state"><h3>intake</h3>
 <p class="match">match: first</p>
 <p class="q">What shape is the request, and is there an open run to resume?</p>
+<div class="always">If the request names multiple independent features, open one plan per feature and run every non-colliding current wave together. Do not serialize independent features.</div>
 <table>
 <tr>
 <td class="if">docs/orchestra/STATE.md exists with an OPEN run</td>
 <td class="then">reconcile BEFORE acting: compare its stamp to `git rev-parse HEAD`, `git status --porcelain`, `git worktree list`; on mismatch the TREE is truth — repair STATE.md first, then enter at its recorded state (do not also classify into another lane this turn)</td>
 </tr>
 <tr>
-<td class="if">the user asks for an unattended/continuous run (&#x27;keep going until done&#x27;, &#x27;run this overnight&#x27;) AND a ledger exists (docs/plans/&lt;feature&gt;-ledger.md or STATE.md ledger pointer)</td>
-<td class="then">confirm the caps and the stop rules with the user, then enter the autonomy loop → autonomy.loop</td>
+<td class="if">the user invokes Orchestra autonomy with a NAMED trigger — &#x27;orchestra autonomy&#x27;, &#x27;run overnight&#x27;, &#x27;unattended until the ledger is done&#x27;, or &#x27;ralph&#x27;/&#x27;ralph-loop&#x27; as aliases for this loop (not a Charge script) — AND a ledger exists (docs/plans/&lt;feature&gt;-ledger.md or STATE.md ledger pointer)</td>
+<td class="then">enter autonomy.loop. Caps: user-stated, else defaults (max passes 20, consecutive no-progress 2). Overnight/asleep: announce defaults and start immediately — do not wait for a second confirmation. Ordinary &#x27;keep going&#x27; / &#x27;don&#x27;t stop&#x27; on a ticket is NOT this trigger. → autonomy.loop</td>
 </tr>
 <tr>
-<td class="if">the user asks for an unattended/continuous run but no ledger exists</td>
+<td class="if">the user uses a named autonomy trigger but no ledger exists</td>
 <td class="then">NOT-READY: autonomy only advances an existing ledger. Classify the work into a lane and plan first; do not enter autonomy.loop</td>
 </tr>
 <tr>
@@ -116,7 +117,7 @@
 </tr>
 <tr>
 <td class="if">ambiguous between lanes</td>
-<td class="then">one classification question to the user with a recommendation; no work starts</td>
+<td class="then">classify into the recommended lane and announce it; do not wait. The only user questions after intake are design.frontier gaps the request did not settle</td>
 </tr>
 </table>
 </div>
@@ -135,16 +136,13 @@
 </table>
 </div>
 <div class="state"><h3>small.design</h3>
-<p class="q">Small lane: is the approach agreed in chat?</p>
+<p class="q">Small lane: is the recommended approach adopted from the request?</p>
 <div class="always">Recon first when the code can answer (scout@L1); never ask the user what the codebase knows.</div>
+<div class="always">Do not wait for a chat OK. Adopt the recommended approach from the request.</div>
 <table>
 <tr>
-<td class="if">approach not yet agreed</td>
-<td class="then">present the approach with a recommendation and wait for the explicit OK</td>
-</tr>
-<tr>
-<td class="if">approach stated in chat and user explicitly OKs it</td>
-<td class="then">→ small.build</td>
+<td class="if">entry</td>
+<td class="then">adopt the recommended approach; do not wait for a chat OK → small.build</td>
 </tr>
 <tr>
 <td class="if">a surprise, ownership conflict, or irreversible step appears</td>
@@ -154,7 +152,7 @@
 </div>
 <div class="state"><h3>small.build</h3>
 <div class="always">Open a minimal STATE.md run entry at dispatch (lane: small, branch, next action) — this is what makes an interrupted small task resumable.</div>
-<div class="always">One fresh builder in the main tree, complete self-contained brief (template: briefs.md; the chat-approved approach text serves as the ticket).</div>
+<div class="always">One fresh builder in the main tree, complete self-contained brief (template: briefs.md; the adopted approach from the request serves as the ticket).</div>
 <div class="always">One fresh reviewer on the diff.</div>
 <table>
 <tr>
@@ -222,18 +220,19 @@
 </table>
 </div>
 <div class="state"><h3>design.frontier</h3>
-<p class="q">Are there unsettled questions only the user can decide?</p>
+<p class="q">Did the user&#x27;s request leave a decision the codebase cannot answer?</p>
+<div class="always">This is the only user-facing stop after intake. Do not ask anything the request already answered. Do not ask what the codebase can answer.</div>
 <table>
 <tr>
-<td class="if">yes</td>
-<td class="then">ask ALL questions whose prerequisites are settled in one round, numbered, each with a recommended answer; loop until none remain</td>
+<td class="if">yes — a decision the request did not settle, and only the user can decide it</td>
+<td class="then">ask ALL such questions whose prerequisites are settled in one round, numbered, each with a recommended answer; loop until none remain</td>
 </tr>
 <tr>
 <td class="if">a question is a fact, not a decision</td>
 <td class="then">route it to recon or research instead of the user <span class="role r-scout">scout@L1</span><span class="role r-researcher">researcher@L1</span></td>
 </tr>
 <tr>
-<td class="if">none remain</td>
+<td class="if">none remain (the request settled the decisions, or the user answered the round)</td>
 <td class="then">→ design.approaches</td>
 </tr>
 </table>
@@ -241,15 +240,15 @@
 <div class="state"><h3>design.approaches</h3>
 <p class="match">match: all</p>
 <p class="q">Has the space been opened (divergence) before it is narrowed (convergence)?</p>
-<div class="always">Diverge before converging: never present one option as though it were the only one. Judging during divergence kills the interesting option.</div>
+<div class="always">Diverge before converging internally: never treat one option as the only one while brainstorming. Then pick the recommendation and continue — do not wait for the user to view the list.</div>
 <table>
 <tr>
 <td class="if">the solution space is not yet opened — a new feature, an unfamiliar problem, or the user has only one idea on the table</td>
-<td class="then">architect brainstorm: 6–10 genuinely distinct options, unfiltered, including a reuse-what-exists option, a far-less-code option, a remove-the-requirement option, and one deliberately bold one; present the list to the user before narrowing <span class="role r-author">architect:brainstorm@L2</span></td>
+<td class="then">architect brainstorm: 6–10 genuinely distinct options, unfiltered, including a reuse-what-exists option, a far-less-code option, a remove-the-requirement option, and one deliberately bold one; orchestrator picks the winner from the request + brainstorm — do not present the list and wait <span class="role r-author">architect:brainstorm@L2</span></td>
 </tr>
 <tr>
 <td class="if">standard shape</td>
-<td class="then">present 2–3 approaches with trade-offs and ONE recommendation → design.spec</td>
+<td class="then">2–3 approaches internally, pick ONE recommendation, continue — do not wait for a pick → design.spec</td>
 </tr>
 <tr>
 <td class="if">a hard-to-reverse module interface exists</td>
@@ -272,6 +271,7 @@
 <div class="state"><h3>design.spec</h3>
 <p class="q">Is the spec drafted?</p>
 <div class="always">Terms ruled on this phase are written to CONTEXT.md (glossary only). Seams the tests will assert at are named in the spec — the plan inherits them.</div>
+<div class="always">Name seams and module boundaries so the planner can cut tracer-bullet tickets that run in parallel. A spec that forces a single serial builder when the surface is independent is unfinished.</div>
 <table>
 <tr>
 <td class="if">3+ rulings or more than one approach explored</td>
@@ -284,24 +284,20 @@
 </table>
 </div>
 <div class="state gate"><h3>design.gate</h3>
-<p class="q">Did the user explicitly approve the spec?</p>
-<div class="always">Approval is explicit, never inferred.</div>
+<p class="q">Did the requirements spot-check pass?</p>
+<div class="always">Do not wait for a user OK. The original request plus any frontier answers are the rulings. Red-team spot-check is the spec gate.</div>
 <table>
 <tr>
 <td class="if">entry</td>
-<td class="then">red-team requirements spot-check on the spec vs the verbatim rulings, before presenting <span class="role r-red">red-teamer:requirements@L1</span></td>
+<td class="then">red-team requirements spot-check on the spec vs the verbatim rulings <span class="role r-red">red-teamer:requirements@L1</span></td>
 </tr>
 <tr>
 <td class="if">spot-check finds ruling drift</td>
 <td class="then back">design.spec — the drift findings (architect L1 revision)</td>
 </tr>
 <tr>
-<td class="if">user approves</td>
+<td class="if">spot-check READY or nits-only</td>
 <td class="then">commit the spec — it is the contract every later phase cites → plan.recon</td>
-</tr>
-<tr>
-<td class="if">changes requested</td>
-<td class="then back">design.spec — the user&#x27;s words, verbatim, as new rulings</td>
 </tr>
 </table>
 </div>
@@ -322,6 +318,7 @@
 </div>
 <div class="state"><h3>plan.draft</h3>
 <div class="always">Version-sensitive claims cite RESEARCH.md on disk — a ticket depending on research that does not exist yet is BLOCKED-ON-RESEARCH, not guessed.</div>
+<div class="always">Segment for maximum safe parallelism: exclusive file lists, wave map, blocking edges only where files or data truly collide. Independent tickets share a wave. Independent features are separate plans whose current waves may run in the same dispatch batch. Serial is a recorded exception, not the default.</div>
 <table>
 <tr>
 <td class="if">always</td>
@@ -347,7 +344,7 @@
 </tr>
 <tr>
 <td class="if">a finding contradicts the spec</td>
-<td class="then">to the USER verbatim with a recommendation — never silently repaired</td>
+<td class="then">orchestrator adjudicates against the original request (request wins); repair the spec/plan; do not pause unless a frontier gap the request never settled appears</td>
 </tr>
 <tr>
 <td class="if">all READY with ZERO findings on round 1 of a large or irreversible plan</td>
@@ -437,7 +434,7 @@
 </tr>
 <tr>
 <td class="if">ESCALATE: contradicts plan/spec</td>
-<td class="then">to the USER verbatim with a recommendation — never into the loop</td>
+<td class="then">orchestrator adjudicates against the original request (request wins); do not pause unless a frontier gap the request never settled appears — never into the loop as silent scope</td>
 </tr>
 </table>
 </div>
@@ -518,7 +515,7 @@
 <p class="match">match: first</p>
 <p class="q">Does the inclusive whole-PR (or whole-branch) review pass — no Critical or Major — before merge?</p>
 <div class="always">Pin the merge-base or the open PR diff. Small diffs pasted; large diffs passed as the pinned command + file list. Runs on PR-landing and on direct-landing (branch diff) alike — hosted Bugbot/Copilot/CodeRabbit on a remote PR are extra, not a substitute.</div>
-<div class="always">Record the verdict (CLEAN or BLOCKED + worst severity) in the ledger and .orchestra/state.json. Nits/Trivial never block merge. This does not replace the gatekeeper or the per-ticket reviewer.</div>
+<div class="always">Record the verdict in the ledger and .orchestra/state.json as reviews.pr = CLEAN or BLOCKED (plus worst severity). That reviews.pr = CLEAN key is what the shell hook reads as merge authorization. Nits/Trivial never block merge. This does not replace the gatekeeper or the per-ticket reviewer.</div>
 <table>
 <tr>
 <td class="if">entry</td>
@@ -533,16 +530,12 @@
 <td class="then back">execute.ticket-loop — the ranked Critical/Major findings as a findings round to a lone builder in the main tree</td>
 </tr>
 <tr>
-<td class="if">CLEAN or nits-only and the run is the small lane and the repo lands via PRs</td>
-<td class="then">→ release.merge</td>
-</tr>
-<tr>
 <td class="if">CLEAN or nits-only and the run is the small lane</td>
-<td class="then">→ terminal.done</td>
+<td class="then">pr-reviewer CLEAN is merge and deploy authorization — releaser lands and deploys; no second chat OK; full e2e is never in this chain → release.merge</td>
 </tr>
 <tr>
 <td class="if">CLEAN or nits-only</td>
-<td class="then">→ audit.decide</td>
+<td class="then">pr-reviewer CLEAN is merge authorization after audit.decide; full e2e is never in this chain → audit.decide</td>
 </tr>
 </table>
 </div>
@@ -569,7 +562,7 @@
 </tr>
 <tr>
 <td class="if">a finding contradicts the spec</td>
-<td class="then">to the USER verbatim</td>
+<td class="then">orchestrator adjudicates against the original request (request wins); do not pause unless a frontier gap the request never settled appears</td>
 </tr>
 <tr>
 <td class="if">findings on executed work</td>
@@ -590,7 +583,7 @@
 <div class="state gate"><h3>release.merge</h3>
 <p class="q">Who gates the merge — the host (server_side_gate) or the local hash record — and can the gated hash be the shipped hash?</p>
 <div class="always">Read the repo&#x27;s delivery declaration (AGENTS.md &#x27;Delivery&#x27; slot + .orchestra/delivery.json): provider, protected branches, landing rule, server_side_gate, deploy policy. Use that provider&#x27;s CLI (github: gh · azure-devops: az repos · gitlab: glab · plain-git: git). server_side_gate is true only when a host branch policy actually runs the fast set — do not infer it from an Azure remote URL alone.</div>
-<div class="always">Hook floor: force-push/stash/rebase/hard-reset are deny. Protected-branch landings and declared deploys ask in a local IDE; ask degrades to deny when headless. Ask is not the merge approval of record — the host branch policy is, when server_side_gate is true; otherwise the local hash check denies protected landings while gates.last_green_hash ≠ HEAD.</div>
+<div class="always">Hook floor: force-push/stash/rebase/hard-reset are deny. The hook never returns ask (no human click). pr-reviewer CLEAN + matching last_green_hash allows land and declared deploys, including headless. Without that pair, protected landings and declared deploys are deny. server_side_gate allows host-mediated PR completion. Full e2e is never a merge precondition.</div>
 <table>
 <tr>
 <td class="if">server_side_gate true (e.g. Azure DevOps branch policy with build validation)</td>
@@ -613,12 +606,8 @@
 <td class="then back">gates.fast — stale-gate: re-run at current HEAD; docs/memory-only commits do NOT void a gate</td>
 </tr>
 <tr>
-<td class="if">merge done and deploy policy is &#x27;auto&#x27; for this repo/environment AND the diff contains no migrations/schema changes</td>
-<td class="then">→ release.deploy</td>
-</tr>
-<tr>
-<td class="if">merge done, deploy gated (production default, or migrations present)</td>
-<td class="then">releaser stages the deploy and pauses: NEEDS-APPROVAL with exact command + blast radius; spec-axis audit must be green before a production deploy. On Azure DevOps, a Pipelines environment approval check is the natural home for this pause — say so when one exists → release.deploy <span class="role r-releaser">releaser@L2</span></td>
+<td class="if">merge done and a deploy is in scope (delivery deploy is auto, push-is-deploy, or migrations that land by push)</td>
+<td class="then">releaser executes the deploy; do not pause for a chat OK → release.deploy <span class="role r-releaser">releaser@L2</span></td>
 </tr>
 <tr>
 <td class="if">merge done and no deploy is configured or in scope for this change</td>
@@ -628,10 +617,11 @@
 </div>
 <div class="state gate"><h3>release.deploy</h3>
 <p class="q">Did the deploy verify?</p>
+<div class="always">Execute. Do not wait for a chat OK. Push-is-deploy hosts (e.g. azure-migration) already deployed at land.</div>
 <table>
 <tr>
-<td class="if">gated and the user approves in chat</td>
-<td class="then">re-dispatch the releaser with the authorization block (USER APPROVED IN CHAT verbatim + EXECUTE EXACTLY); hook ask is a local-IDE tripwire, not the approval of record <span class="role r-releaser">releaser@L2</span></td>
+<td class="if">entry</td>
+<td class="then">releaser executes the deploy (host CLI or the land push) and records evidence <span class="role r-releaser">releaser@L2</span></td>
 </tr>
 <tr>
 <td class="if">deploy executed</td>
@@ -642,7 +632,7 @@
 <td class="then">→ release.rollback</td>
 </tr>
 <tr>
-<td class="if">verified, or user defers the deploy (record &#x27;deferred:&#x27; in STATE.md — it survives the idle reset)</td>
+<td class="if">verified</td>
 <td class="then">→ cleanup.final</td>
 </tr>
 </table>
@@ -685,7 +675,7 @@
 <table>
 <tr>
 <td class="if">no loop yet</td>
-<td class="then">build one (failing test &gt; curl &gt; CLI diff &gt; headless browser &gt; bisect harness); non-deterministic → raise and state the reproduction rate first; perf → measured baseline before any change; no loop possible → stop and ask the user</td>
+<td class="then">build one (failing test &gt; curl &gt; CLI diff &gt; headless browser &gt; bisect harness); non-deterministic → raise and state the reproduction rate first; perf → measured baseline before any change; no loop possible → BLOCKED naming what is missing — do not wait for a chat OK</td>
 </tr>
 <tr>
 <td class="if">loop exists</td>
@@ -724,7 +714,8 @@
 <div class="state"><h3>autonomy.loop</h3>
 <p class="q">Unattended mode: is there an unfinished ledger item and budget left?</p>
 <div class="always">A ledger file (docs/plans/&lt;feature&gt;-ledger.md, or the path STATE.md points at) must exist; otherwise NOT-READY — autonomy cannot start without a plan.</div>
-<div class="always">Never invent work: the loop only advances items already in the plan&#x27;s ledger. New scope stops the loop and goes to the user.</div>
+<div class="always">Cursor may merge. A host block-pr-merge.sh rail is a defect — install.sh strips it. After pr-reviewer CLEAN the releaser lands and deploys; do not wait for a human.</div>
+<div class="always">Never invent work: the loop only advances items already in the plan&#x27;s ledger. Extra ideas go to the polish queue — do not stop for the user.</div>
 <div class="always">Each pass is a fresh dispatch through the normal chain (execute.ticket-loop → execute.review → gates.fast); autonomy changes WHO decides to continue, never WHAT the roles do.</div>
 <div class="always">A ledger item flips to done only on evidence (command + exit code). Flipping without evidence is the one tamper rule.</div>
 <table>
@@ -734,7 +725,7 @@
 </tr>
 <tr>
 <td class="if">entry</td>
-<td class="then">record the caps the user set: max passes, max consecutive no-progress passes (default 2), token/time budget, and the approval boundaries that halt the loop</td>
+<td class="then">record caps (user-stated or defaults: max passes 20, consecutive no-progress 2). After pr-reviewer CLEAN, releaser lands and deploys — that CLEAN is authorization, not a second chat OK. Do not halt for deploy. Full e2e is never in this loop. Announce the caps on the first pass.</td>
 </tr>
 <tr>
 <td class="if">an unblocked ledger item remains and caps are not hit</td>
@@ -745,12 +736,12 @@
 <td class="then">STALLED — stop and report; a loop that is not converging burns budget without learning</td>
 </tr>
 <tr>
-<td class="if">a pass needs a gated action (deploy, external send, schema change)</td>
-<td class="then">NEEDS-APPROVAL — halt the loop and surface it; the loop never approves on the user&#x27;s behalf</td>
+<td class="if">a pass needs a land or deploy action</td>
+<td class="then">releaser executes it after pr-reviewer CLEAN; do not halt for a chat OK. Destructive git stays deny. Host MCP apply_migration stays denied if that rail exists.</td>
 </tr>
 <tr>
 <td class="if">a finding contradicts the plan or spec, or new scope appears</td>
-<td class="then">stop and take it to the user — autonomy is permission to work, not permission to redesign</td>
+<td class="then">orchestrator adjudicates: original request wins; park extras on the polish queue; do not stop unless a frontier decision the request never settled appears</td>
 </tr>
 <tr>
 <td class="if">caps hit</td>
@@ -764,7 +755,7 @@
 </div>
 </div>
 <h2>Interrupts</h2><div class="phase"><div class="state"><table>
-<tr><td class="if">user changes a ruling mid-run</td><td class="then">back to design.gate: record the resume point (ledger + STATE.md); settle in-flight dispatches per the ledger; architect L1 revision of the spec carrying the new ruling verbatim -&gt; design.gate for approval; then planner Repair scoped to the affected tickets only -&gt; plan.redteam re-dispatching ONLY the touched lenses; then re-enter execute.ticket-loop at the recorded resume point</td></tr>
+<tr><td class="if">user changes a ruling mid-run</td><td class="then">back to design.gate: record the resume point (ledger + STATE.md); settle in-flight dispatches per the ledger; architect L1 revision of the spec carrying the new ruling verbatim -&gt; design.gate (spot-check, no user OK); then planner Repair scoped to the affected tickets only -&gt; plan.redteam re-dispatching ONLY the touched lenses; then re-enter execute.ticket-loop at the recorded resume point</td></tr>
 <tr><td class="if">user interrupt during execution</td><td class="then">stop dispatching; report ledger state; resume from the ledger — never re-dispatch blind (two builders on one ticket in one tree is corruption)</td></tr>
 <tr><td class="if">a dispatch errors or never returns</td><td class="then">check the ledger and tree for partial commits, then dispatch fresh; liveness for background agents = state file + mtime at the verified sub-agent state path</td></tr>
 </table></div></div>
@@ -773,7 +764,7 @@
 <tr><td class="if">worktrees</td><td class="then">Topology A: sub-agents share the VM&#x27;s single clone and single git index, so the local rule applies unchanged — 2+ concurrent builders get worktrees inside the VM. Topology B: each VM is already an isolated clone; no worktrees.</td></tr>
 <tr><td class="if">handoff</td><td class="then">Topology A: briefs + shared disk, as local. Topology B: nothing but git (pushed branches) and the orchestrator relaying report text — anything load-bearing must be committed, because gitignored files do not exist in a fresh clone.</td></tr>
 <tr><td class="if">conversation</td><td class="then">A cloud orchestrator cannot hold a live conversation; it reaches the user asynchronously (Slack, web, PR comments). Design and plan are conversations — run them locally. Execute waves are the natural cloud workload.</td></tr>
-<tr><td class="if">enforcement</td><td class="then">In cloud, `ask` is undefined behavior (cloud agents auto-run commands), so the hook degrades ask -&gt; DENY when headless. .orchestra/state.json is gitignored and therefore absent from a fresh clone: a protected landing with no readable gate record is DENIED in cloud. The correct cloud answer is server_side_gate — set it only when a host branch policy actually runs the fast set; do not default it true for every Azure remote. Host-mediated landings stay allowed; direct pushes to protected branches never do. Hooks also do not run during a cloud agent&#x27;s early read-only turns. Seed state.json from docs/orchestra/state.example.json when missing.</td></tr>
+<tr><td class="if">enforcement</td><td class="then">The hook never returns ask. Headless land/deploy is allow when reviews.pr=CLEAN and gates.last_green_hash matches HEAD (write those in-session before the releaser). A fresh clone has no state.json — seed from docs/orchestra/state.example.json; a protected landing with no CLEAN+fresh record is DENIED. server_side_gate allows host-mediated PR completion. Hooks also do not run during a cloud agent&#x27;s early read-only turns.</td></tr>
 <tr><td class="if">config</td><td class="then">Repo-level config travels with the clone (.cursor/agents, .cursor/skills, .cursor/hooks.json, AGENTS.md). User-level config (~/.cursor/*) does NOT. Keep this package project-scoped.</td></tr>
 </table></div></div>
 <h2>Invariants</h2><div class="inv"><ul>
@@ -783,7 +774,7 @@
 <li>Evidence = command + exit code (captured without pipes) or both-theme screenshots; assertions are not evidence.</li>
 <li>Worktrees only for 2+ concurrent editors; created, integrated, and removed by the orchestrator within the wave.</li>
 <li>Judgement roles (architect, planner, red-teamer, auditor, builder-max, pr-reviewer) run model: inherit — the ceiling; the rest are pinned lower at install (install.sh verifies).</li>
-<li>Approval boundaries: destructive git is deny; protected landings ask locally and deny when headless; host branch policy is the merge gate of record when server_side_gate is true; files never authorize.</li>
+<li>Approval boundaries: destructive git is deny. The hook never returns ask. pr-reviewer CLEAN + matching last_green_hash is merge and deploy authorization (including headless). Without CLEAN, protected landings and declared deploys are deny. The only user-facing stop after intake is design.frontier for decisions the request did not settle. Specs, plans, reviews, merges, and deploys do not wait. Full e2e is never in the execute/review/release chain.</li>
 <li>Memory lands in the batch-closing commit; stale entries are pruned, not superseded-in-place.</li>
 <li>Honest terminal states — DONE, BLOCKED, NOT-READY, NEEDS-APPROVAL; never one dressed as another.</li>
 <li>Every transition announced: `flow: &lt;from&gt; -&gt; &lt;to&gt; (&lt;matched if&gt;)`.</li>

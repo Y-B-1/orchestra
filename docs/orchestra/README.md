@@ -4,14 +4,17 @@ These files are **shells**, not a second constitution.
 
 | File | Role |
 |---|---|
-| `AGENTS.framework.md` | Charter template copied only when the host has no `AGENTS.md`. |
+| `AGENTS.framework.md` | Charter template written to `CLAUDE.md` when the host has none. `AGENTS.md` is a symlink to that file. |
 | `AGENT-MEMORY.framework.md` | Memory-index template copied only when no index exists. |
 | `state.example.json` | Schema for gitignored `.orchestra/state.json`. Cloud clones start empty; copy this locally or commit what the next role needs. |
 | `STATE.template.md` | Lives next to the orchestrator skill; working memory for one run. |
 | `generate-flow-html.py` | Builds `docs/flow.html` from `flow.json` so the two cannot drift. |
+| `generate-claude-agents.py` | Writes `.claude/agents/*.md` from Cursor bodies + Claude model/effort YAML. |
+| `claude-models.md` | Claude Code matrix (Fable 5 low / Opus 5 medium / Sonnet 5 medium). |
+| `claude-settings.fragment.json` | Hook upserts for `.claude/settings.json`. |
 | `HOOKS.md` | What Orchestra installs vs what a host keeps. Merge, never wipe host hooks. |
 
-**Heal** (`.cursor/hooks/heal-orchestra-docs.py`, run from `sessionStart`): create missing files from the frameworks; append a missing `## Orchestra` block; prepend a missing **How to fill** on the memory index. Never overwrite filled project slots.
+**Heal** (`.cursor/hooks/heal-orchestra-docs.py`, run from `sessionStart`): create missing `CLAUDE.md` from the framework; make `AGENTS.md` a symlink to it; refuse a link to `~/.claude/CLAUDE.md`; append a missing `## Orchestra` block; prepend a missing **How to fill** on the memory index. Never overwrite filled project slots.
 
 **Agent file = the role.** `.cursor/agents/<role>.md` is the empty-context job (system prompt). Cursor does **not** auto-bind `skills/<role>/SKILL.md` by name. Do not add a duplicate skill per worker. Phase skills under `.cursor/skills/` are hire playbooks for the **main session** only (`disable-model-invocation: true`). Briefs in `briefs.md` are extra payload per dispatch.
 

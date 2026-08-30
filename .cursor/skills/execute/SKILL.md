@@ -6,12 +6,12 @@ disable-model-invocation: true
 
 # Execute
 
-You coordinate and talk to the user; builders build; reviewers review. Briefs come from `briefs.md` — filled completely, since builders have clean context.
+You coordinate; builders build; reviewers review. Briefs come from `briefs.md` — filled completely, since builders have clean context. After frontier, do not pause for a chat OK.
 
 ## Setup
 
 1. Feature branch + the ledger file `docs/plans/<feature>-ledger.md` (always separate) before the first dispatch. Read repo memory; carry only what the wave needs.
-2. **Hire the wave, not a sequence.** The plan's current wave is the set of tickets you dispatch together: one fresh builder per ticket, all in one message. A builder implements one ticket and never launches another builder. Serial only when a blocking edge, shared file ownership, or a failed worktree proof says so. Do not serialize independent work.
+2. **Hire the maximum safe set, not a sequence.** The current wave is every unblocked ticket whose files do not overlap — including tickets from other open plans in this batch. Dispatch one fresh builder per ticket, all in one message, plus a reviewer per finished ticket as soon as its diff exists. A builder implements one ticket and never launches another builder. Serial only when a blocking edge, shared file ownership, or a failed worktree proof says so. Record that choice. Do not serialize independent work.
 3. **Worktrees for 2+ builders sharing one checkout** — a local session, or sub-agents inside a single cloud VM (one shared tree = one shared git index). Builders that are each their own cloud agent skip this entirely: the VM is the isolation, each pushes its own branch, and integration means fetching those branches. The rule: `git worktree add <repo>/.cursor/worktrees/<ticket> -b <ticket-branch>`. First check you are not already inside one (`git rev-parse --git-dir` ≠ `--git-common-dir`), and keep `.cursor/worktrees/` gitignored. Install dependencies and **prove each toolchain** (run the real test runner once — install output lies) before dispatching; a proof that survives one repair attempt broken collapses the wave to sequential in the main tree. Own ports per tree. Cursor 3.5+ may delete unmanaged worktree dirs (`~/.cursor/worktrees/`, `cursor.worktreeMaxCount`); commits on named ticket branches are the only preservation. The nest hook records `git_branch` from `subagentStart` — janitor inspects `git worktree list` plus that ledger, not only `.cursor/worktrees/<ticket>`. Never `git stash` while worktrees exist.
 
 ## Per ticket

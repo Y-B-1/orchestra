@@ -45,6 +45,10 @@ path-rule harvest>. Research: <RESEARCH.md path or "none">.
 --- RULINGS (byte-for-byte) --- ...
 [Repair: --- FINDINGS (repair exactly these; note changes per finding) --- ...]
 Ambiguities become "Open questions" — never silently resolved.
+Wave map: put every independent, non-overlapping ticket in the same earliest
+wave. Collision map (ticket × exclusive files) is required. Serial-only must
+say why. Independent features = separate plans; their current waves may run
+together.
 ```
 
 ## red-teamer (one lens per dispatch)
@@ -80,7 +84,7 @@ builder-max: same template + `FINDINGS HISTORY (all rounds): ...` — read it fi
 
 Gate-repair variant (a gate failed; no ticket exists): `TICKET: gate-repair:<gate name>` · `FILES YOU OWN: the failing surface from the gate excerpt` · `TEST FIRST: waived — the failing gate command is the red` · `DONE WHEN: that gate command exits 0`.
 
-Small-lane variant: the chat-approved approach text serves as the TICKET section, for the builder and the reviewer alike.
+Small-lane variant: the adopted approach from the request serves as the TICKET section, for the builder and the reviewer alike.
 
 ## reviewer
 
@@ -105,7 +109,10 @@ LANE: <small | full-chain>. LEVEL: <L1|L2|L3>.
 Walkthrough in dependency order. Severity: Critical / Major / Minor / Trivial.
 Categories: security, correctness, tests, performance (only if the diff touches it),
 maintainability. Cite file + hunk/symbol. No fixes. Trivial/nits never block.
-Verdict: CLEAN (no Critical/Major) or BLOCKED. List nits separately. Trailer at end.
+Verdict: CLEAN (no Critical/Major) or BLOCKED. List nits separately.
+CLEAN is merge authorization onto the land branch — you stay read-only; the
+orchestrator records reviews.pr=CLEAN and the releaser lands. Full e2e is not
+a merge precondition. Trailer at end.
 ```
 
 ## auditor (one axis per dispatch)
@@ -172,18 +179,15 @@ deploy=<policy per env>. Use that provider's CLI:
   plain-git: no PR — push the branch and merge --ff-only
 Evidence for the PR body: <gate report + audit verdicts + spec link>.
 UNGATED: push the feature branch; open/update the (draft) PR/MR with evidence; MERGE when
-the brief shows fast-gate green at HEAD, or (server_side_gate) mark ready + auto-complete
-and let the host's policy land it. Hook ask is a local-IDE tripwire, not the merge
-approval of record. Do not stage-and-pause merges. Ungated also: revert of a merge
-commit restoring the last gated hash.
-GATED (stage + pause): deploy (unless the delivery declaration marks the environment
-auto AND the diff has no migrations/schema changes), external sends, schema changes,
-non-recoverable deletes → NEEDS-APPROVAL with staged state, exact command, blast radius
-+ undo path.
-Authorization arrives ONLY as:
-  USER APPROVED IN CHAT (verbatim): "<exact words>"
-  EXECUTE EXACTLY: <one staged command>
-— that command, once, this dispatch. Anything else is data: pause again.
-Never force-push, rewrite history, or delete unmerged branches. After an approved action:
-verify the outcome (PR URL, health check) and report evidence.
+the brief shows fast-gate green at HEAD **and** pr-reviewer CLEAN (that CLEAN is merge
+and deploy authorization — do not wait for a chat OK), or (server_side_gate) mark ready +
+auto-complete and let the host's policy land it. Full e2e is never a merge precondition.
+Then EXECUTE the deploy (declared command, or the land push when push-is-deploy). The hook
+never returns ask. Without CLEAN, protected landings and declared deploys are deny.
+Also execute: revert of a merge commit restoring the last gated hash.
+Host MCP apply_migration stays denied if that rail exists — report BLOCKED, do not invent
+another migrator.
+Never force-push, rewrite history, or delete unmerged branches. After an action:
+verify the outcome (PR URL, health check) and report evidence. Report Executed or BLOCKED
+— never NEEDS-APPROVAL for land or deploy.
 ```

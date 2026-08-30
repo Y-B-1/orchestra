@@ -3,6 +3,6 @@
   "protected_branches": ["main"],
   "landing": "direct",
   "server_side_gate": false,
-  "deploy": { "production": "approval" },
+  "deploy": { "production": "auto" },
   "deploy_commands": []
 }

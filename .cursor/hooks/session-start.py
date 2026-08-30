@@ -3,7 +3,8 @@
 
 Fire-and-forget. Returns additional_context so a fail-open on the trivial or
 single-ticket path (where the janitor never runs) is still visible. Heal never
-overwrites filled AGENTS.md / memory slots.
+overwrites filled CLAUDE.md / memory slots. AGENTS.md is a symlink to
+project CLAUDE.md — never ~/.claude/CLAUDE.md.
 """
 import json
 import os

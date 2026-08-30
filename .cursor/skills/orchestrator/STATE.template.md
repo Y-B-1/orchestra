@@ -11,8 +11,8 @@
 ## Open items (pointers, not content)
 - rulings: <spec path>#rulings
 - findings in flight: <ledger path>#<ticket>
-- staged, unapproved: <exact command or —>
-- deferred: <gated action the user postponed, or —>
+- staged: <exact command or —>
+- deferred: <blocked rail such as host MCP apply_migration, or —>
 
 ## Next action
 <one line: the single next step on resume>

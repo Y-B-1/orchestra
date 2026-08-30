@@ -19,9 +19,14 @@
 ## Current
 
 - **snapshot** · sibling `../orchestra-roster` · 2026-08-28 · Frozen Claude original; living package is GitHub `Y-B-1/orchestra`.
-- **charter** · `AGENTS.md`, `docs/AGENT-MEMORY.md` · 2026-08-28 · These are fill-in frameworks (headings + how-to-fill), not a forced constitution; janitor + `sessionStart` heal steward them; never clobber a host's filled slots.
+- **charter** · `CLAUDE.md` + `AGENTS.md` → `CLAUDE.md` · 2026-08-28 · Fill-in frameworks; janitor + `sessionStart` heal steward them; never clobber filled slots; never symlink to `~/.claude/CLAUDE.md`.
+- **independence** · Orchestra package · 2026-08-28 · Orchestra does not inherit Charge. Hosts that run Orchestra use `flow.json` only.
+- **autonomy** · `flow.json` `autonomy.loop` · 2026-08-30 · Named invocation only. After pr-reviewer CLEAN the releaser lands **and deploys**; full e2e is never in the chain. Do not halt for deploy.
+- **a-to-z** · Orchestra A-to-Z · 2026-08-30 · After intake the only user-facing stop is unanswered frontier questions. Specs, plans, reviews, merges, and deploys do not wait. The hook never returns ask.
+- **claude-runtime** · `.claude/agents/`, `docs/orchestra/claude-models.md` · 2026-08-30 · Second harness beside Cursor. Fable 5 low / Opus 5 medium / Sonnet 5 medium. No `.claude/skills/orchestrator/`.
+- **parallel-waves** · planner + `flow.json` · 2026-08-30 · Maximize concurrent builders; exclusive file lists; independent plans' current waves run together; serial only on collision or failed isolation.
 - **identity** · `.cursor/skills/orchestrator/SKILL.md` · 2026-08-28 · "You are the Orchestrator" belongs only in the orchestrator skill (main session). `AGENTS.md` alwaysApply must not inject that identity into workers.
 - **parked** · agent-count / target roster · 2026-08-28 · Folding janitor/releaser/researcher/builder-max is still paused. `pr-reviewer` was added by request (13th worker); do not treat that as a license to fold the original twelve.
 - **pr-reviewer** · `.cursor/agents/pr-reviewer.md`, `flow.json` `review.pr` · 2026-08-28 · Inclusive whole-PR/branch review after the fast gate, before merge. Does not replace gatekeeper, per-ticket reviewer, or two-axis auditor. Nits/Trivial never block. Runs on PR-landing and direct-landing.
 - **skill-lock** · `.cursor/skills/*/SKILL.md` `disable-model-invocation: true` · 2026-08-28 · Phase skills (including orchestrator and pr-review) must not auto-load into workers. `install.sh` fails if the flag is missing.
-- **hooks** · `docs/orchestra/HOOKS.md` · 2026-08-28 · Orchestra ships four scripts / three events. Host rails (ports, git-add, migrate deny) stay. Conflicts (Equiti unblocked push vs gate-hash; Cursor-never-merge vs releaser) are named at install, not auto-deleted.
+- **hooks** · `docs/orchestra/HOOKS.md` · 2026-08-30 · Orchestra ships four scripts / three events. Host rails stay except `block-pr-merge.sh`, which install strips. Hook never returns ask. pr-reviewer CLEAN + matching gate hash is merge and deploy authorization (hook allows headless). Full e2e is never in the chain.

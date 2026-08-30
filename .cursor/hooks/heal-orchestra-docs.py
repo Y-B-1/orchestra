@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""sessionStart: keep AGENTS.md and AGENT-MEMORY.md as fill-in frameworks.
+"""sessionStart: keep CLAUDE.md / AGENTS.md and AGENT-MEMORY.md as fill-in frameworks.
 
 Creates missing files from docs/orchestra/*.framework.md. Appends a missing
 ## Orchestra block. Prepends a missing How-to-fill on memory. Never overwrites
 filled project slots. Fail-open (empty JSON) so a missing template cannot
 brick a session; every action is logged.
+
+Charter rule: CLAUDE.md is the real file. AGENTS.md is a symlink to it (Cursor's
+name). Never follow or copy ~/.claude/CLAUDE.md — that is global Claude config,
+not the project charter.
 """
 import json
 import os
@@ -12,6 +16,7 @@ import sys
 
 LOG = os.path.join(".orchestra", "hook-failures.log")
 AGENTS = "AGENTS.md"
+CLAUDE = "CLAUDE.md"
 MEMORY_CANDIDATES = [
     "docs/AGENT-MEMORY.md",
     "docs/agent-memory.md",
@@ -53,6 +58,36 @@ def write(path, text):
         return False
 
 
+def project_dir():
+    return os.path.realpath(os.getcwd())
+
+
+def inside_project(path):
+    root = project_dir()
+    real = os.path.realpath(path)
+    return real == root or real.startswith(root + os.sep)
+
+
+def is_outside_symlink(path):
+    """True when path is a symlink whose resolved target is outside this repo."""
+    if not os.path.islink(path):
+        return False
+    return not inside_project(path)
+
+
+def unlink_outside(path, label):
+    if not is_outside_symlink(path):
+        return False
+    log(f"{label} pointed outside the project ({os.path.realpath(path)}) — "
+        "refusing (never ~/.claude/CLAUDE.md); removing the link")
+    try:
+        os.unlink(path)
+    except OSError as e:
+        log(f"could not unlink {path}: {type(e).__name__}")
+        return True
+    return False
+
+
 def orchestra_block():
     framed = read(FRAME_AGENTS) or ""
     if ORCHESTRA_HEADING in framed:
@@ -67,19 +102,79 @@ def orchestra_block():
     )
 
 
+def ensure_agents_symlink():
+    """AGENTS.md must be a relative symlink to project CLAUDE.md."""
+    unlink_outside(AGENTS, "AGENTS.md")
+    if os.path.islink(AGENTS):
+        target = os.readlink(AGENTS)
+        if target == CLAUDE:
+            return True
+        log(f"AGENTS.md symlink was {target!r}; retargeting to {CLAUDE}")
+        try:
+            os.unlink(AGENTS)
+        except OSError as e:
+            log(f"could not unlink AGENTS.md: {type(e).__name__}")
+            return False
+    elif os.path.isfile(AGENTS):
+        if not os.path.isfile(CLAUDE):
+            text = read(AGENTS)
+            if text is not None:
+                write(CLAUDE, text)
+                log("copied AGENTS.md → CLAUDE.md")
+            try:
+                os.remove(AGENTS)
+            except OSError as e:
+                log(f"could not remove AGENTS.md after copy: {type(e).__name__}")
+                return False
+        else:
+            a, c = read(AGENTS), read(CLAUDE)
+            if a == c:
+                try:
+                    os.remove(AGENTS)
+                    log("AGENTS.md was a duplicate of CLAUDE.md — replacing with symlink")
+                except OSError as e:
+                    log(f"could not remove duplicate AGENTS.md: {type(e).__name__}")
+                    return False
+            else:
+                log("AGENTS.md and CLAUDE.md both exist and differ — left both; "
+                    "will not destroy either to force a symlink")
+                return False
+    if not os.path.lexists(AGENTS) and os.path.isfile(CLAUDE):
+        try:
+            os.symlink(CLAUDE, AGENTS)
+            log("linked AGENTS.md -> CLAUDE.md")
+        except OSError as e:
+            log(f"symlink failed: {type(e).__name__}")
+            return False
+    return True
+
+
 def heal_agents():
-    text = read(AGENTS)
+    unlink_outside(CLAUDE, "CLAUDE.md")
+    text = read(CLAUDE)
     frame = read(FRAME_AGENTS)
     if text is None:
-        if frame:
-            write(AGENTS, frame)
-            log("created AGENTS.md from framework")
+        if os.path.isfile(AGENTS) and not os.path.islink(AGENTS):
+            text = read(AGENTS)
+            if text:
+                write(CLAUDE, text)
+                log("created CLAUDE.md from existing AGENTS.md")
+        elif frame:
+            write(CLAUDE, frame)
+            log("created CLAUDE.md from framework")
         else:
-            log("AGENTS.md missing and no framework on disk")
+            log("CLAUDE.md missing and no framework on disk")
+            return
+        text = read(CLAUDE)
+
+    ensure_agents_symlink()
+
+    text = read(CLAUDE)
+    if text is None:
         return
     if ORCHESTRA_HEADING not in text:
-        write(AGENTS, text.rstrip() + "\n\n" + orchestra_block())
-        log("appended ## Orchestra to AGENTS.md")
+        write(CLAUDE, text.rstrip() + "\n\n" + orchestra_block())
+        log("appended ## Orchestra to CLAUDE.md")
 
 
 def existing_memory_path():
