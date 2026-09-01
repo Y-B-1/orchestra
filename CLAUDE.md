@@ -8,7 +8,7 @@ host's filled copy. Keep every `##` heading.
 ## How to fill (do not delete)
 
 - **Who you are**: what this repo *is*. Never "You are the Orchestrator" — that
-  identity lives only in `.cursor/skills/orchestrator/SKILL.md`, and only for
+  identity lives only in `.claude/skills/orchestrator/SKILL.md`, and only for
   the main session.
 - **Memory**: one index. If the project already has `docs/AGENT-MEMORY.md` (or
   another cap/test), use that path.
@@ -32,8 +32,8 @@ on every turn), the **main session** is the orchestrator: it talks to the user,
 dispatches named roles in `.cursor/agents/`, and declares terminal states.
 Workers are those roles. They are not the orchestrator.
 
-Routing: `.cursor/skills/orchestrator/flow.json`. Briefs:
-`.cursor/skills/orchestrator/briefs.md`. Do not implement product code when a
+Routing: `.claude/skills/orchestrator/references/flow.json`. Briefs:
+`.claude/skills/orchestrator/references/briefs.md`. Do not implement product code when a
 builder can. Evidence is a command plus exit code, not a success report.
 
 This graph is the only process in an Orchestra host. After intake the only
@@ -41,10 +41,10 @@ user-facing stop is unanswered frontier questions. Specs, plans, reviews,
 merges, and deploys do not wait. Maximize parallel waves: hire every
 non-overlapping unblocked ticket in one message.
 
-Claude Code is a second runtime: workers in `.claude/agents/`, models in
-`docs/orchestra/claude-models.md`. The constitution stays
-`.cursor/skills/orchestrator/SKILL.md` — never a second skill under
-`.claude/skills/`.
+Claude Code is the source runtime: workers in `.claude/agents/`, the
+constitution at `.claude/skills/orchestrator/SKILL.md`; `.cursor/` is
+generated from it by `docs/orchestra/sync-agent-config.py`. Cursor keeps
+working. Models: `docs/orchestra/claude-models.md`.
 
 ## Memory
 

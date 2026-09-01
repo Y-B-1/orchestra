@@ -11,7 +11,7 @@ Everything else is a **host rail**. Install merges; it never deletes host hooks.
 | `subagentStart` | `block-nested-subagents.py` | Deny nested Task spawns (`subagent_id` + `parent_conversation_id`). Fan-out is orchestrator-owned. |
 | `sessionStart` | `session-start.py` → `heal-orchestra-docs.py` | Heal missing charter/memory headings; keep `AGENTS.md` → project `CLAUDE.md` (never `~/.claude/CLAUDE.md`); seed `state.json` from the example; surface `hook-failures.log`. Never overwrite filled host slots. |
 
-Claude Code (same jobs, different payload): `.claude/hooks/orchestra-block-dangerous.py` (PreToolUse Bash), `orchestra-block-nested.py` (PreToolUse Agent — deny when `agent_type` is set), `orchestra-session-start.py` (heal + inject the Cursor orchestrator skill path). Install upserts those into `.claude/settings.json` and never wipes host Claude hooks. Do **not** add `.claude/skills/orchestrator/`.
+Claude Code hooks, source in `.claude/hooks/` (each with its own `.test.sh`; `.cursor/hooks/heal-orchestra-docs.py` and `.cursor/hooks/block-dangerous.py` are thin shims onto the Claude source, not separate implementations): `block-dangerous.py` (PreToolUse Bash), `orchestra-block-nested.py` (PreToolUse Agent — deny when `agent_type` is set), `orchestra-session-start.py` + `routing-context.md` (heal + inject the Claude orchestrator skill path), `orchestra-block-worker-skill.py` (deny a worker loading the orchestrator skill), `orchestra-worker-context.py` (tell a dispatched worker not to load it), `heal-orchestra-docs.py`. Install upserts those into `.claude/settings.json` and never wipes host Claude hooks. ~~Do **not** add `.claude/skills/orchestrator/`.~~ **Superseded 2026-09-02 (U8).**
 
 `install.sh` copies the Cursor scripts (`ORCHESTRA_HOOKS`) and **upserts** those commands in `.cursor/hooks.json` by basename. Host entries with other basenames stay — **except** `block-pr-merge.sh`, which the installer **strips**. Cursor never-merge is incompatible with ralph / pr-reviewer CLEAN land.
 
@@ -19,14 +19,14 @@ Claude Code (same jobs, different payload): `.claude/hooks/orchestra-block-dange
 
 ## Orchestra must not ship
 
-Do **not** add these to the package. They are product or Claude-harness policy:
+These stay out of the package. They are product or Claude-harness policy:
 
 - Port locks (Equiti `guard-port-4173`)
 - `git add` path discipline (`guard-git-add` — never `-A`)
 - MCP `apply_migration` deny
 - “Cursor never merges” / session YOLO env bypasses (installer **strips** `block-pr-merge.sh`; do not re-add it)
 - Claude `Stop` prompt hooks, `.claude/.bypass-guards`
-- A second orchestrator skill under `.claude/skills/` (Cursor also loads that directory)
+- ~~A second orchestrator skill under `.claude/skills/` (Cursor also loads that directory)~~ **Superseded 2026-09-02 (U8):** `.claude/skills/orchestrator/` is now the source; `.cursor/skills/orchestrator/` is generated from it.
 
 If a host needs any of those, they stay as **host rails** next to Orchestra, not inside the package.
 
@@ -51,7 +51,7 @@ Two policies can both fire. Name the conflict; pick one; put the winner in `.orc
 
 ## Dual runtime (Cursor + Claude) in one folder
 
-Allowed. Cursor reads `.cursor/hooks.json`; Claude Code reads `.claude/settings.json`. Orchestra’s installer does not touch `.claude/`. Do not delete `.claude/` to “make it Cursor-only” — Equiti’s path rules and several Cursor hooks **are wrappers around** `.claude/hooks/`.
+Allowed. Cursor reads `.cursor/hooks.json`; Claude Code reads `.claude/settings.json`. Orchestra's installer **does** touch `.claude/`: it merges the agent bodies (preserving a host's own `skills:` preloads), copies `.claude/hooks/` + tests, copies the two `.claude/skills/` (`orchestrator`, `orchestra-rails`), then runs `docs/orchestra/sync-agent-config.py` to regenerate every `.cursor/**` mirror. Do not delete `.claude/` to "make it Cursor-only" — several Cursor files are generated from it and a host's own path rules may wrap `.claude/hooks/`.
 
 ## After Cursor updates
 

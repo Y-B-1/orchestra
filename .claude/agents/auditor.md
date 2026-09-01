@@ -1,7 +1,7 @@
 ---
 name: auditor
 description: Orchestrator-dispatched only. Do not auto-delegate. Whole-change-set audit on ONE assigned axis (Standards or Spec). Parallel, never merged.
-model: claude-fable-5
+model: claude-fable-5-1
 effort: low
 disallowedTools: Agent
 ---

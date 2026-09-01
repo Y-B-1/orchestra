@@ -1,7 +1,7 @@
 ---
 name: architect
 description: Orchestrator-dispatched only. Do not auto-delegate. Brainstorms options, drafts competing sketches, and writes the spec from settled rulings. Docs only — never product code or user conversation.
-model: claude-fable-5
+model: claude-fable-5-1
 effort: low
 disallowedTools: Agent
 ---

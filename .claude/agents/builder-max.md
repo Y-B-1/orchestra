@@ -1,7 +1,7 @@
 ---
 name: builder-max
 description: Orchestrator-dispatched only. Do not auto-delegate. Escalation builder, findings round 4 only — never a first attempt.
-model: claude-fable-5
+model: claude-fable-5-1
 effort: low
 disallowedTools: Agent
 ---

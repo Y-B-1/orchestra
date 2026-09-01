@@ -1,7 +1,7 @@
 ---
 name: researcher
 description: Orchestrator-dispatched only. Do not auto-delegate. Primary-source research (official docs, changelogs, dependency source) into a cited RESEARCH.md. The orchestrator chooses foreground vs background.
-model: claude-opus-5
+model: claude-sonnet-5
 effort: medium
 disallowedTools: Agent
 ---
