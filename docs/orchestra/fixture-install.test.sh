@@ -13,6 +13,7 @@ bad() { say "FAIL: $*"; FAIL=1; }
 UP="$(cd "$(dirname "$0")/../.." && pwd)"                          # package root, resolved from this script's own location — never hard-coded
 SCRATCH="${SCRATCH:-$(mktemp -d)}"                                 # honour the caller's scratch dir; default to a fresh temp dir when unset
 export PYTHONDONTWRITEBYTECODE=1                                   # every python3 the two installs spawn must never write .cursor/hooks/__pycache__/*.pyc — machine- and version-specific bytes that must never reach cursor.diff
+export LC_ALL=C                                                    # pin collation for every sort-sensitive step below — this script's own tree walk and any sort/ls/grep -r it or install.sh runs
 
 FIX="$SCRATCH/fixture"; rm -rf "$FIX"; mkdir -p "$FIX/pkg-old" "$FIX/old" "$FIX/new"
 git -C "$UP" archive 5860b59 | tar -x -C "$FIX/pkg-old"           # the pre-port package, read-only extraction
@@ -34,7 +35,48 @@ if [ "$old_exit" -ne 0 ]; then
   say "note: the 0.3.0 install itself exited $old_exit — recorded, never patched around; see install-old.log"
 fi
 
-( cd "$FIX" && diff -r old/.cursor new/.cursor ) > "$FIX/cursor.diff" 2>&1; diff_exit=$?; echo "diff-exit:$diff_exit"
+# `diff -r` itself walks directories in a platform-dependent order (BSD diff on
+# macOS vs GNU diff on Linux, plus locale collation) — the SAME hunks come out
+# in a different sequence on each, which reads as a mismatch against a
+# fixture generated on one platform. So cursor.diff is built canonically
+# here instead: our own recursive walk in a fixed (C-locale, codepoint) sort
+# order at every directory level, one path list valid on any platform,
+# printing the exact `diff -r` line shapes ("Only in X: name",
+# "diff -r old/… new/…" + the plain-diff body from a plain two-file `diff`
+# call, which is order-independent because it names its two files directly).
+( cd "$FIX" && python3 - old/.cursor new/.cursor <<'PY' > "$FIX/cursor.diff"
+import filecmp, os, subprocess, sys
+
+old_root, new_root = sys.argv[1], sys.argv[2]
+saw_diff = False
+
+def walk(old_dir, new_dir):
+    global saw_diff
+    old_names = set(os.listdir(old_dir)) if os.path.isdir(old_dir) else set()
+    new_names = set(os.listdir(new_dir)) if os.path.isdir(new_dir) else set()
+    for name in sorted(old_names | new_names):  # codepoint order == C locale for the ASCII names in this tree
+        o, n = os.path.join(old_dir, name), os.path.join(new_dir, name)
+        if name in old_names and name not in new_names:
+            print(f"Only in {old_dir}: {name}"); saw_diff = True; continue
+        if name in new_names and name not in old_names:
+            print(f"Only in {new_dir}: {name}"); saw_diff = True; continue
+        o_isdir, n_isdir = os.path.isdir(o), os.path.isdir(n)
+        if o_isdir and n_isdir:
+            walk(o, n)
+        elif o_isdir or n_isdir:
+            kind = lambda p, isdir: "directory" if isdir else "regular file"
+            print(f"File {o} is a {kind(o, o_isdir)} while file {n} is a {kind(n, n_isdir)}")
+            saw_diff = True
+        elif not filecmp.cmp(o, n, shallow=False):
+            print(f"diff -r {o} {n}")
+            body = subprocess.run(["diff", o, n], capture_output=True, text=True).stdout
+            sys.stdout.write(body)
+            saw_diff = True
+
+walk(old_root, new_root)
+sys.exit(1 if saw_diff else 0)
+PY
+); diff_exit=$?; echo "diff-exit:$diff_exit"
 
 diff "$FIX/cursor.diff" "$UP/docs/orchestra/fixtures/cursor-diff.expected" > "$FIX/expect.log" 2>&1; expect_exit=$?; echo "expect-exit:$expect_exit"
 [ "$expect_exit" -eq 0 ] || { bad "cursor.diff does not match the committed expectation:"; cat "$FIX/expect.log"; }
