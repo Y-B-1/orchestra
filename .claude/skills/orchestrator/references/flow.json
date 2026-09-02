@@ -1,0 +1,879 @@
+{
+  "version": 2,
+  "title": "Orchestra routing graph",
+  "schema": {
+    "route_fields": "if (prose predicate) \u00b7 then (string step, or array = parallel batch) \u00b7 dispatch (tokens role[:lens][@level], resolvable against roles; @L2 default) \u00b7 next (forward edge, must name a real state) \u00b7 back_to + carry (backward edge + what travels back)",
+    "state_fields": "question \u00b7 always (duties that fire on every entry, before route matching) \u00b7 routes \u00b7 match ('first' default = exclusive; 'all' = every matching route fires, at most one names next)",
+    "announce": "Every transition is announced in chat as `flow: <from> -> <to> (<matched if>)`. A transition without an announcement is a routing defect.",
+    "validate": "python3 -c \"import json;d=json.load(open('.claude/skills/orchestrator/references/flow.json'));s=set(d['states']);bad=[(k,e) for k,v in d['states'].items() for r in v.get('routes',[]) for e in [r.get('next'),r.get('back_to')] if e and e not in s];print(bad or 'edges ok')\"",
+    "reentry": "A back_to carry OVERRIDES the target state's entry route text and stays active until the re-entered loop completes (e.g. plan.redteam re-entry after repair re-dispatches only the repaired lens; execute.ticket-loop re-entry on findings resumes the SAME builder; gates.fast re-entry after gate-repair skips execute.wave-close's always batch)."
+  },
+  "entry": "intake",
+  "roles": {
+    "orchestrator": "main session \u2014 talks to the user, dispatches everyone, adjudicates, merges, approves, owns memory",
+    "scout": ".claude/agents/scout.md",
+    "researcher": ".claude/agents/researcher.md",
+    "architect": ".claude/agents/architect.md",
+    "planner": ".claude/agents/planner.md",
+    "red-teamer": ".claude/agents/red-teamer.md",
+    "builder": ".claude/agents/builder.md",
+    "builder-max": ".claude/agents/builder-max.md",
+    "reviewer": ".claude/agents/reviewer.md",
+    "pr-reviewer": ".claude/agents/pr-reviewer.md",
+    "auditor": ".claude/agents/auditor.md",
+    "gatekeeper": ".claude/agents/gatekeeper.md",
+    "janitor": ".claude/agents/janitor.md",
+    "releaser": ".claude/agents/releaser.md"
+  },
+  "levels": "Dispatch tokens carry @L1 (minimal) / @L2 (standard, default) / @L3 (deep). Each agent file defines what its levels mean \u2014 the level contract travels in the brief. Which roles fire in which state, and at what level, IS the activation model; there is no separate matrix.",
+  "state_files": {
+    "docs/orchestra/STATE.md": "working memory \u2014 orchestrator sole writer; pointers not content; rewritten at wave/batch closes and before deliberate stops; stamped `written-at: <timestamp> @ <git HEAD>`; working-tree file, committed only inside batch-closing commits; 120-line cap is a smoke alarm (over = you are duplicating content that has a home), never an eviction trigger; verbatim quotes only when a ruling fits one line, else pointer only \u2014 never a trimmed quote",
+    ".orchestra/state.json": "machine run-record (gitignored) \u2014 exact keys: gates.last_green_hash (the green commit hash; the hook denies protected pushes while it differs from HEAD), gates.reports{<hash>: report}, redteam{verdicts,rounds,run_ids}, reviews{<ticket>: verdict, pr: CLEAN|BLOCKED}, flakes[], subagent_state_path. Written by the orchestrator at the transitions marked here; read by hooks and the janitor.",
+    "docs/plans/<feature>-ledger.md": "run state for one plan \u2014 always a separate file, never a section in the plan; CLOSED stamp at archive",
+    "docs/AGENT-MEMORY.md": "long-term repo memory \u2014 fill-in index (how-to-fill + Current); janitor drafts and prunes, orchestrator commits in the batch-closing commit; git is the history \u2014 no append-only markers",
+    ".orchestra/delivery.json": "per-repo delivery declaration (COMMITTED, unlike gitignored .orchestra/ files): provider (github | azure-devops | gitlab | plain-git), protected_branches, landing (pr | direct), server_side_gate (host enforces the gate itself), deploy policy per environment (default auto), deploy_commands patterns the hook allows only with CLEAN+fresh. install.sh detects the provider from the remote URL; the orchestrator reads this file before any release action.",
+    ".orchestra/package-version": "install stamp (COMMITTED via gitignore exception): copy of repo-root VERSION plus git describe. Written by install.sh so a host can see which orchestra package it merged."
+  },
+  "states": {
+    "intake": {
+      "question": "What shape is the request, and is there an open run to resume?",
+      "match": "first",
+      "always": [
+        "If the request names multiple independent features, open one plan per feature and run every non-colliding current wave together. Do not serialize independent features."
+      ],
+      "routes": [
+        {
+          "if": "docs/orchestra/STATE.md exists with an OPEN run",
+          "then": "reconcile BEFORE acting: compare its stamp to `git rev-parse HEAD`, `git status --porcelain`, `git worktree list`; on mismatch the TREE is truth \u2014 repair STATE.md first, then enter at its recorded state (do not also classify into another lane this turn)"
+        },
+        {
+          "if": "the user invokes Orchestra autonomy with a NAMED trigger \u2014 'orchestra autonomy', 'run overnight', 'unattended until the ledger is done', or 'ralph'/'ralph-loop' as aliases for this loop (not a Charge script) \u2014 AND a ledger exists (docs/plans/<feature>-ledger.md or STATE.md ledger pointer)",
+          "then": "enter autonomy.loop. Caps: user-stated, else defaults (max passes 20, consecutive no-progress 2). Overnight/asleep: announce defaults and start immediately \u2014 do not wait for a second confirmation. Ordinary 'keep going' / 'don't stop' on a ticket is NOT this trigger.",
+          "next": "autonomy.loop"
+        },
+        {
+          "if": "the user uses a named autonomy trigger but no ledger exists",
+          "then": "NOT-READY: autonomy only advances an existing ledger. Classify the work into a lane and plan first; do not enter autonomy.loop"
+        },
+        {
+          "if": "full-suite request ('run the full e2e', scheduled trigger)",
+          "next": "fullsuite.run"
+        },
+        {
+          "if": "'review this branch/PR'",
+          "next": "audit.run"
+        },
+        {
+          "if": "bug, failing test, regression, 'it's slow'",
+          "next": "bug.feedback-loop"
+        },
+        {
+          "if": "question the codebase can answer",
+          "then": "answer from recon, END",
+          "dispatch": "scout@L1"
+        },
+        {
+          "if": "external API / version question",
+          "then": "answer from a primary-source check, END \u2014 orchestrator chooses foreground vs background; researcher is not always-background",
+          "dispatch": "researcher@L1"
+        },
+        {
+          "if": "trivial: one file, obvious, reversible",
+          "next": "trivial.inline"
+        },
+        {
+          "if": "small standard change: roughly 2\u20135 files, no migration, reversible",
+          "next": "small.design"
+        },
+        {
+          "if": "non-trivial feature/change: multi-wave, multi-subsystem, a migration, or hard to reverse",
+          "next": "design.recon"
+        },
+        {
+          "if": "ambiguous between lanes",
+          "then": "classify into the recommended lane and announce it; do not wait. The only user questions after intake are design.frontier gaps the request did not settle"
+        }
+      ]
+    },
+    "trivial.inline": {
+      "routes": [
+        {
+          "if": "always",
+          "then": "two-sentence design in chat; implement inline; evidence-gated DONE (command + exit code); END \u2014 no STATE.md obligation"
+        },
+        {
+          "if": "it grows past one file or one surprise",
+          "back_to": "intake",
+          "carry": "reclassify into small.design or design.recon"
+        }
+      ]
+    },
+    "small.design": {
+      "question": "Small lane: is the recommended approach adopted from the request?",
+      "always": [
+        "Recon first when the code can answer (scout@L1); never ask the user what the codebase knows.",
+        "Do not wait for a chat OK. Adopt the recommended approach from the request."
+      ],
+      "routes": [
+        {
+          "if": "entry",
+          "then": "adopt the recommended approach; do not wait for a chat OK",
+          "next": "small.build"
+        },
+        {
+          "if": "a surprise, ownership conflict, or irreversible step appears",
+          "back_to": "intake",
+          "carry": "promote to the full chain (design.recon)"
+        }
+      ]
+    },
+    "small.build": {
+      "always": [
+        "Open a minimal STATE.md run entry at dispatch (lane: small, branch, next action) \u2014 this is what makes an interrupted small task resumable.",
+        "One fresh builder in the main tree, complete self-contained brief (template: briefs.md; the adopted approach from the request serves as the ticket).",
+        "One fresh reviewer on the diff."
+      ],
+      "routes": [
+        {
+          "if": "entry",
+          "then": "dispatch the builder, then the reviewer on its diff",
+          "dispatch": "builder@L2 + reviewer@L1"
+        },
+        {
+          "if": "review PASS",
+          "next": "small.close"
+        },
+        {
+          "if": "reviewer flags implausible evidence",
+          "then": "gatekeeper re-proof of that done_when only; PASS continues, FAIL counts as a findings round",
+          "dispatch": "gatekeeper:re-proof@L1"
+        },
+        {
+          "if": "FINDINGS rounds 1\u20133",
+          "then": "same builder resumes with the findings; re-review"
+        },
+        {
+          "if": "FINDINGS round 4",
+          "then": "escalation builder with the full findings history",
+          "dispatch": "builder-max"
+        },
+        {
+          "if": "FINDINGS round 5",
+          "then": "orchestrator adjudicates: fix inline decision, park with the user, or promote to the full chain"
+        }
+      ]
+    },
+    "small.close": {
+      "always": [
+        "gates.fast set at HEAD (see gates.fast contents); record the review verdict and set gates.last_green_hash in .orchestra/state.json exactly as gates.fast does.",
+        "Rewrite STATE.md (close the run entry); memory line to docs/AGENT-MEMORY.md only if a trap was found."
+      ],
+      "routes": [
+        {
+          "if": "entry",
+          "then": "run the fast set",
+          "dispatch": "gatekeeper:fast@L1"
+        },
+        {
+          "if": "gate green and the repo lands via PRs",
+          "then": "open the PR with evidence if one is not already open (ungated)",
+          "dispatch": "releaser@L1",
+          "next": "review.pr"
+        },
+        {
+          "if": "gate green, no PR flow",
+          "next": "review.pr"
+        },
+        {
+          "if": "gate FAIL",
+          "back_to": "small.build",
+          "carry": "the failing gate excerpt as findings"
+        }
+      ]
+    },
+    "design.recon": {
+      "always": [
+        "No product code in any design state (throwaway prototype code on a clearly-marked disposable branch is not product code).",
+        "Record every user decision verbatim, at the moment it is made."
+      ],
+      "routes": [
+        {
+          "if": "the codebase can answer open questions",
+          "then": "dispatch scouts in parallel for all of them",
+          "dispatch": "scout@L2",
+          "next": "design.frontier"
+        },
+        {
+          "if": "no open codebase questions",
+          "next": "design.frontier"
+        }
+      ]
+    },
+    "design.frontier": {
+      "question": "Did the user's request leave a decision the codebase cannot answer?",
+      "always": [
+        "This is the only user-facing stop after intake. Do not ask anything the request already answered. Do not ask what the codebase can answer."
+      ],
+      "routes": [
+        {
+          "if": "yes \u2014 a decision the request did not settle, and only the user can decide it",
+          "then": "ask ALL such questions whose prerequisites are settled in one round, numbered, each with a recommended answer; loop until none remain"
+        },
+        {
+          "if": "a question is a fact, not a decision",
+          "then": "route it to recon or research instead of the user",
+          "dispatch": "scout@L1 | researcher@L1"
+        },
+        {
+          "if": "none remain (the request settled the decisions, or the user answered the round)",
+          "next": "design.approaches"
+        }
+      ]
+    },
+    "design.approaches": {
+      "question": "Has the space been opened (divergence) before it is narrowed (convergence)?",
+      "match": "all",
+      "routes": [
+        {
+          "if": "the solution space is not yet opened \u2014 a new feature, an unfamiliar problem, or the user has only one idea on the table",
+          "then": "architect brainstorm: 6\u201310 genuinely distinct options, unfiltered, including a reuse-what-exists option, a far-less-code option, a remove-the-requirement option, and one deliberately bold one; orchestrator picks the winner from the request + brainstorm \u2014 do not present the list and wait",
+          "dispatch": "architect:brainstorm@L2"
+        },
+        {
+          "if": "standard shape",
+          "then": "2\u20133 approaches internally, pick ONE recommendation, continue \u2014 do not wait for a pick",
+          "next": "design.spec"
+        },
+        {
+          "if": "a hard-to-reverse module interface exists",
+          "then": [
+            "architect sketches 2\u20133 radically different interfaces in parallel",
+            "red-teamer:judge compares on depth/locality/seams"
+          ],
+          "dispatch": "architect:sketch@L2 + red-teamer:judge@L2"
+        },
+        {
+          "if": "a question only running code can answer",
+          "then": "throwaway prototype on a disposable branch (clearly marked, one command to run, no polish); harvest the answer; record the ruling"
+        },
+        {
+          "if": "design leans on an industry standard or post-cutoff API",
+          "then": "queue researcher for the plan phase (orchestrator chooses background; the agent file is not always-background)",
+          "dispatch": "researcher@L2"
+        },
+        {
+          "if": "approach settled (winner chosen, prototype harvested, or approaches presented)",
+          "next": "design.spec"
+        }
+      ],
+      "always": [
+        "Diverge before converging internally: never treat one option as the only one while brainstorming. Then pick the recommendation and continue \u2014 do not wait for the user to view the list."
+      ]
+    },
+    "design.spec": {
+      "question": "Is the spec drafted?",
+      "routes": [
+        {
+          "if": "3+ rulings or more than one approach explored",
+          "then": "architect drafts the spec from recon + winning approach + verbatim rulings; diff its returned Rulings section against your record \u2014 any difference is a defect",
+          "dispatch": "architect:spec@L2",
+          "next": "design.gate"
+        },
+        {
+          "if": "small design (fewer than ~3 rulings, one approach)",
+          "then": "orchestrator drafts inline and says so; self-review for placeholders, contradictions, dual-readable lines, scope creep",
+          "next": "design.gate"
+        }
+      ],
+      "always": [
+        "Terms ruled on this phase are written to CONTEXT.md (glossary only). Seams the tests will assert at are named in the spec \u2014 the plan inherits them.",
+        "Name seams and module boundaries so the planner can cut tracer-bullet tickets that run in parallel. A spec that forces a single serial builder when the surface is independent is unfinished."
+      ]
+    },
+    "design.gate": {
+      "question": "Did the requirements spot-check pass?",
+      "always": [
+        "Do not wait for a user OK. The original request plus any frontier answers are the rulings. Red-team spot-check is the spec gate."
+      ],
+      "routes": [
+        {
+          "if": "entry",
+          "then": "red-team requirements spot-check on the spec vs the verbatim rulings",
+          "dispatch": "red-teamer:requirements@L1"
+        },
+        {
+          "if": "spot-check finds ruling drift",
+          "back_to": "design.spec",
+          "carry": "the drift findings (architect L1 revision)"
+        },
+        {
+          "if": "spot-check READY or nits-only",
+          "then": "commit the spec \u2014 it is the contract every later phase cites",
+          "next": "plan.recon"
+        }
+      ]
+    },
+    "plan.recon": {
+      "question": "Does planning need recon beyond what design already gathered?",
+      "routes": [
+        {
+          "if": "design recon left open questions, ticket briefs need a path-rule harvest, or design happened in a previous session",
+          "then": "scout maps the gaps + harvests .cursor/rules and AGENTS.md excerpts for the touched paths",
+          "dispatch": "scout@L2",
+          "next": "plan.draft"
+        },
+        {
+          "if": "design recon suffices",
+          "then": "carry it forward and say so in the plan",
+          "next": "plan.draft"
+        }
+      ]
+    },
+    "plan.draft": {
+      "always": [
+        "Version-sensitive claims cite RESEARCH.md on disk \u2014 a ticket depending on research that does not exist yet is BLOCKED-ON-RESEARCH, not guessed.",
+        "Segment for maximum safe parallelism: exclusive file lists, wave map, blocking edges only where files or data truly collide. Independent tickets share a wave. Independent features are separate plans whose current waves may run in the same dispatch batch. Serial is a recorded exception, not the default."
+      ],
+      "routes": [
+        {
+          "if": "always",
+          "then": "planner drafts the ticketed plan from spec + recon + research (brief template: briefs.md); orchestrator reviews the ticket summary and diffs quoted rulings against its record",
+          "dispatch": "planner@L2",
+          "next": "plan.redteam"
+        }
+      ]
+    },
+    "plan.redteam": {
+      "question": "Do all three lenses return READY?",
+      "always": [
+        "Record verdicts, rounds, and run ids into .orchestra/state.json \u2014 the plan is not executable without a redteam record.",
+        "CONTEXT CHECK (boundary duty): if fill is over 40%, apply `context_discipline` before dispatching the next wave \u2014 continue / clear / handoff / subagent / compact, first yes wins."
+      ],
+      "routes": [
+        {
+          "if": "entry",
+          "then": "three red-teamers in parallel, fresh context, one lens each: requirements (spec+rulings pasted) \u00b7 feasibility (must name a breaking file/symbol) \u00b7 scope (ownership traps, missing edges, hidden migrations, unguarded irreversibles)",
+          "dispatch": "red-teamer:requirements@L2 + red-teamer:feasibility@L2 + red-teamer:scope@L2"
+        },
+        {
+          "if": "any lens NOT-READY, repair rounds 1\u20133",
+          "back_to": "plan.draft",
+          "carry": "ONLY the failed lens's findings to the planner; re-dispatch ONLY that lens after repair, fresh context"
+        },
+        {
+          "if": "repair round 4+",
+          "then": "orchestrator adjudicates: repair inline, park with the user, or NOT-READY as the honest terminal state"
+        },
+        {
+          "if": "a finding contradicts the spec",
+          "then": "orchestrator adjudicates against the original request (request wins); repair the spec/plan; do not pause unless a frontier gap the request never settled appears"
+        },
+        {
+          "if": "all READY with ZERO findings on round 1 of a large or irreversible plan",
+          "then": "suspect the skeptics: tighten briefs (paste rulings, name the diff surface), rerun once; READY-with-minor-findings is a normal first-round outcome and is accepted"
+        },
+        {
+          "if": "all READY",
+          "then": "commit the plan",
+          "next": "execute.setup"
+        }
+      ]
+    },
+    "execute.setup": {
+      "question": "How many builders edit concurrently, and do they share a filesystem?",
+      "always": [
+        "Ledger file (docs/plans/<feature>-ledger.md) exists before the first dispatch.",
+        "Never git stash while worktrees exist.",
+        "Maximize parallelism without mixing work: dispatch every unblocked ticket in the current wave whose files do not overlap, in one message. Serial only on a blocking edge, shared file ownership, or a failed worktree proof. You hire N builders; a builder never hires another builder."
+      ],
+      "routes": [
+        {
+          "if": "1 builder",
+          "then": "main tree, no worktree",
+          "next": "execute.ticket-loop"
+        },
+        {
+          "if": "2+ builders sharing one checkout (local session, or sub-agents inside ONE cloud VM)",
+          "then": "one worktree per builder (git worktree add <repo>/.cursor/worktrees/<ticket> -b <ticket-branch>; check you are not already inside one; .cursor/worktrees/ gitignored); install dependencies and PROVE each toolchain before dispatch; own ports per tree. Cursor 3.5+ may delete unmanaged worktree dirs (~/.cursor/worktrees/, cursor.worktreeMaxCount); named-branch commits are the preservation. Ledger git_branch from subagentStart (nest hook records it). Janitor inspects git worktree list, not only .cursor/worktrees/<ticket>.",
+          "next": "execute.ticket-loop"
+        },
+        {
+          "if": "each builder is its own cloud agent (separate VM and clone)",
+          "then": "no worktrees \u2014 the VM is the isolation; each pushes its own branch, and integration happens by fetching those branches; anything the next role needs must be COMMITTED, since gitignored files do not travel",
+          "next": "execute.ticket-loop"
+        },
+        {
+          "if": "a worktree's toolchain proof fails and one repair attempt does not fix it",
+          "then": "collapse the wave to sequential builders in the main tree \u2014 never dispatch into a broken tree",
+          "next": "execute.ticket-loop"
+        }
+      ]
+    },
+    "execute.ticket-loop": {
+      "question": "Is there an unblocked ticket?",
+      "routes": [
+        {
+          "if": "yes (several independent \u2192 parallel, worktree rule applies)",
+          "then": "orchestrator hires one fresh builder per ticket in this wave, all in one message, each with its complete self-contained brief; ledger 'running' only after dispatch returns an id. Builders do not spawn builders.",
+          "dispatch": "builder@L2",
+          "next": "execute.review"
+        },
+        {
+          "if": "builder reports BLOCKED on a plan defect (missing file ownership, wrong command)",
+          "back_to": "plan.draft",
+          "carry": "the defect as a planner L1 repair; other tickets keep running"
+        },
+        {
+          "if": "builder reports BLOCKED for another reason",
+          "then": "resolve or take to the user; re-dispatch"
+        },
+        {
+          "if": "no tickets remain",
+          "next": "execute.integrate"
+        }
+      ]
+    },
+    "execute.review": {
+      "question": "What does the fresh reviewer say about this ticket's diff?",
+      "always": [
+        "Builder success reports are never evidence.",
+        "Record the review verdict per ticket into .orchestra/state.json and the ledger."
+      ],
+      "routes": [
+        {
+          "if": "entry",
+          "then": "fresh reviewer with ticket + diff + builder's claimed evidence + trailer",
+          "dispatch": "reviewer@L2"
+        },
+        {
+          "if": "reviewer flags implausible evidence",
+          "then": "gatekeeper re-proof: that ticket's done_when only, honest capture",
+          "dispatch": "gatekeeper:re-proof@L1"
+        },
+        {
+          "if": "PASS",
+          "then": "ledger complete with evidence",
+          "next": "execute.ticket-loop"
+        },
+        {
+          "if": "FINDINGS rounds 1\u20133",
+          "back_to": "execute.ticket-loop",
+          "carry": "findings to the SAME builder (resume; a fresh builder with the findings history counts when resume is unavailable)"
+        },
+        {
+          "if": "FINDINGS round 4",
+          "then": "escalation builder with the full findings history",
+          "dispatch": "builder-max"
+        },
+        {
+          "if": "FINDINGS round 5",
+          "then": "orchestrator adjudicates: fix decision inline, park in ledger as known issue, or ticket BLOCKED"
+        },
+        {
+          "if": "ESCALATE: contradicts plan/spec",
+          "then": "orchestrator adjudicates against the original request (request wins); do not pause unless a frontier gap the request never settled appears \u2014 never into the loop as silent scope"
+        }
+      ]
+    },
+    "execute.integrate": {
+      "question": "Are the wave's ticket branches merged into the feature branch?",
+      "routes": [
+        {
+          "if": "lone-builder wave (work already on the feature branch)",
+          "next": "execute.wave-close"
+        },
+        {
+          "if": "builders ran as separate cloud agents",
+          "then": "fetch their pushed branches and merge each into the feature branch, ordered by blocking edges \u2014 same conflict discipline, remote source"
+        },
+        {
+          "if": "all reviews PASS",
+          "then": "orchestrator merges each ticket branch into the feature branch in the main tree, ordered by blocking edges; conflicts resolved in daylight \u2014 both intents preserved, never --abort, never invented behavior",
+          "next": "execute.wave-close"
+        },
+        {
+          "if": "a conflict is too entangled",
+          "then": "fresh builder as a findings round with both tickets pasted; its diff goes through execute.review before wave close",
+          "dispatch": "builder@L2",
+          "next": "execute.review"
+        }
+      ],
+      "always": [
+        "CONTEXT CHECK (boundary duty): if fill is over 40%, apply `context_discipline` before dispatching the next wave \u2014 continue / clear / handoff / subagent / compact, first yes wins."
+      ]
+    },
+    "execute.wave-close": {
+      "always": [
+        "Rewrite docs/orchestra/STATE.md (stamped).",
+        "CONTEXT CHECK (boundary duty): if fill is over 40%, apply `context_discipline` before dispatching the next wave \u2014 continue / clear / handoff / subagent / compact, first yes wins."
+      ],
+      "match": "all",
+      "routes": [
+        {
+          "if": "worktrees exist or the batch spanned 2+ tickets",
+          "then": "janitor: directory inspection (rescue-or-remove), memory draft from the pasted ledger excerpt, process-adherence checklist (every ticket has a review verdict in state.json; no unmerged ticket branches; redteam record present); orchestrator executes removals and commits the memory draft in this batch-closing commit",
+          "dispatch": "janitor@L2"
+        },
+        {
+          "if": "single-ticket batch, no worktrees",
+          "then": "orchestrator writes the memory line itself in the batch-closing commit"
+        },
+        {
+          "if": "first wave of the feature and the repo lands via PRs/MRs (delivery.landing != 'direct')",
+          "then": "open a DRAFT PR/MR now with the provider's CLI \u2014 early, cheap, never a blocker; evidence-so-far in the body",
+          "dispatch": "releaser@L1"
+        },
+        {
+          "if": "always (last step)",
+          "next": "gates.fast"
+        }
+      ]
+    },
+    "gates.fast": {
+      "question": "Does the fast set pass at the post-merge, post-memory HEAD?",
+      "always": [
+        "The orchestrator derives or approves the file\u2192spec mapping and pastes the exact command list \u2014 scoping is never the gatekeeper's guess.",
+        "Record the report into .orchestra/state.json under gates.reports keyed by commit hash, and on green set gates.last_green_hash to that hash \u2014 the hook reads exactly this key.",
+        "Widening is mechanical, not judgment: a diff touching dependency manifests, build/tsconfig, migrations/schema, shared types/tokens, or auth widens the scoped set.",
+        "CONTEXT CHECK (boundary duty): if fill is over 40%, apply `context_discipline` before dispatching the next wave \u2014 continue / clear / handoff / subagent / compact, first yes wins."
+      ],
+      "routes": [
+        {
+          "if": "entry",
+          "then": "fast set at HEAD: lint + typecheck + scoped unit + smoke core + framework doctor (per the repo's verified tooling list, e.g. React Doctor on React repos) + scoped e2e when a user-facing flow changed (isolated port)",
+          "dispatch": "gatekeeper:fast@L2"
+        },
+        {
+          "if": "FAIL",
+          "back_to": "execute.ticket-loop",
+          "carry": "the failing gate excerpt as findings to a lone builder in the main tree; re-run the set after \u2014 skip the wave-close always-batch on gate-repair re-entry"
+        },
+        {
+          "if": "FLAKY",
+          "then": "quarantine ledger in state.json: first occurrence \u2192 ship allowed + flake ticketed; second occurrence of the same flake \u2192 mandatory fix ticket before that surface merges again; no per-flake user question after the first"
+        },
+        {
+          "if": "green and more waves remain",
+          "next": "execute.setup"
+        },
+        {
+          "if": "green and the feature is complete",
+          "next": "review.pr"
+        }
+      ]
+    },
+    "review.pr": {
+      "question": "Does the inclusive whole-PR (or whole-branch) review pass \u2014 no Critical or Major \u2014 before merge?",
+      "always": [
+        "Pin the merge-base or the open PR diff. Small diffs pasted; large diffs passed as the pinned command + file list. Runs on PR-landing and on direct-landing (branch diff) alike \u2014 hosted Bugbot/Copilot/CodeRabbit on a remote PR are extra, not a substitute.",
+        "Record the verdict in the ledger and .orchestra/state.json as reviews.pr = CLEAN or BLOCKED (plus worst severity). That reviews.pr = CLEAN key is what the shell hook reads as merge authorization. Nits/Trivial never block merge. This does not replace the gatekeeper or the per-ticket reviewer."
+      ],
+      "match": "first",
+      "routes": [
+        {
+          "if": "entry",
+          "then": "dispatch one pr-reviewer on the whole change about to merge",
+          "dispatch": "pr-reviewer@L2"
+        },
+        {
+          "if": "BLOCKED (Critical or Major) and the run is the small lane",
+          "back_to": "small.build",
+          "carry": "the ranked Critical/Major findings as a findings round"
+        },
+        {
+          "if": "BLOCKED (Critical or Major)",
+          "back_to": "execute.ticket-loop",
+          "carry": "the ranked Critical/Major findings as a findings round to a lone builder in the main tree"
+        },
+        {
+          "if": "CLEAN or nits-only and the run is the small lane",
+          "then": "pr-reviewer CLEAN is merge and deploy authorization \u2014 releaser lands and deploys; no second chat OK; full e2e is never in this chain",
+          "next": "release.merge"
+        },
+        {
+          "if": "CLEAN or nits-only",
+          "then": "pr-reviewer CLEAN is merge authorization after audit.decide; full e2e is never in this chain",
+          "next": "audit.decide"
+        }
+      ]
+    },
+    "audit.decide": {
+      "question": "Does this change-set need the two-axis audit before release?",
+      "routes": [
+        {
+          "if": "the batch closed with 2+ tickets, or the user asks",
+          "next": "audit.run"
+        },
+        {
+          "if": "single-ticket run (the reviewer already saw the whole diff)",
+          "next": "release.merge"
+        }
+      ]
+    },
+    "audit.run": {
+      "question": "What do the two axes report?",
+      "always": [
+        "Reports are presented verbatim, never merged \u2014 separation prevents one axis masking the other."
+      ],
+      "routes": [
+        {
+          "if": "entry",
+          "then": "auditor(standards) + auditor(spec) in parallel; small diffs pasted, large diffs passed as the pinned command + file list",
+          "dispatch": "auditor:standards@L2 + auditor:spec@L2"
+        },
+        {
+          "if": "a finding contradicts the spec",
+          "then": "orchestrator adjudicates against the original request (request wins); do not pause unless a frontier gap the request never settled appears"
+        },
+        {
+          "if": "findings on executed work",
+          "back_to": "execute.ticket-loop",
+          "carry": "verified findings as a findings round; re-audit the touched surface after"
+        },
+        {
+          "if": "standalone review request (entered from intake)",
+          "then": "present both reports with per-axis worst-issue lines; END \u2014 no gates, no release, no push",
+          "next": "terminal.done"
+        },
+        {
+          "if": "both CLEAN or user accepts residuals (chain run)",
+          "next": "release.merge"
+        }
+      ]
+    },
+    "release.merge": {
+      "question": "Who gates the merge \u2014 the host (server_side_gate) or the local hash record \u2014 and can the gated hash be the shipped hash?",
+      "always": [
+        "Read the repo's delivery declaration (AGENTS.md 'Delivery' slot + .orchestra/delivery.json): provider, protected branches, landing rule, server_side_gate, deploy policy. Use that provider's CLI (github: gh \u00b7 azure-devops: az repos \u00b7 gitlab: glab \u00b7 plain-git: git). server_side_gate is true only when a host branch policy actually runs the fast set \u2014 do not infer it from an Azure remote URL alone.",
+        "Hook floor: force-push/stash/rebase/hard-reset are deny. The hook never returns ask (no human click). pr-reviewer CLEAN + matching last_green_hash allows land and declared deploys, including headless. Without that pair, protected landings and declared deploys are deny. server_side_gate allows host-mediated PR completion. Full e2e is never a merge precondition."
+      ],
+      "routes": [
+        {
+          "if": "server_side_gate true (e.g. Azure DevOps branch policy with build validation)",
+          "then": "make sure the host's required checks match the fast set; mark the PR ready and set auto-complete \u2014 the platform gates and merges the preview merge commit, so the gated hash is provably the shipped hash",
+          "dispatch": "releaser@L2"
+        },
+        {
+          "if": "no server-side gate, fast-gate green at HEAD, branch current with the target",
+          "then": "mark the PR ready with the final gate report; merge fast-forward so the gated hash becomes the target HEAD",
+          "dispatch": "releaser@L2"
+        },
+        {
+          "if": "no server-side gate and the branch is behind the target",
+          "then": "merge the target INTO the feature branch (agent-run rebases are blocked by the guardrail), re-run the fast set, then fast-forward",
+          "dispatch": "releaser@L2 + gatekeeper:fast@L1"
+        },
+        {
+          "if": "fast-forward impractical",
+          "then": "merge, then auto re-run the fast set at the target HEAD (mechanical, non-approval); only that green releases a deploy",
+          "dispatch": "releaser@L2 + gatekeeper:fast@L1"
+        },
+        {
+          "if": "no server-side gate and HEAD moved past the gate record (mechanical check: `git diff --stat <gate-hash>..HEAD -- ':!docs' ':!*.md'` non-empty)",
+          "back_to": "gates.fast",
+          "carry": "stale-gate: re-run at current HEAD; docs/memory-only commits do NOT void a gate"
+        },
+        {
+          "if": "merge done and a deploy is in scope (delivery deploy is auto, push-is-deploy, or migrations that land by push)",
+          "then": "releaser executes the deploy; do not pause for a chat OK",
+          "dispatch": "releaser@L2",
+          "next": "release.deploy"
+        },
+        {
+          "if": "merge done and no deploy is configured or in scope for this change",
+          "next": "cleanup.final"
+        }
+      ]
+    },
+    "release.deploy": {
+      "question": "Did the deploy verify?",
+      "always": [
+        "Execute. Do not wait for a chat OK. Push-is-deploy hosts (e.g. a host whose land branch is off `protected_branches` and whose CI deploys on push) already deployed at land."
+      ],
+      "routes": [
+        {
+          "if": "entry",
+          "then": "releaser executes the deploy (host CLI or the land push) and records evidence",
+          "dispatch": "releaser@L2"
+        },
+        {
+          "if": "deploy executed",
+          "then": "verify the health check and record evidence"
+        },
+        {
+          "if": "health check fails, or main breaks after merge",
+          "next": "release.rollback"
+        },
+        {
+          "if": "verified",
+          "next": "cleanup.final"
+        }
+      ]
+    },
+    "release.rollback": {
+      "always": [
+        "Revert first, diagnose second \u2014 restoring the last gated state is auto-executable because it restores a proven hash."
+      ],
+      "routes": [
+        {
+          "if": "entry",
+          "then": "releaser stages the revert of the merge commit; execute; verify the health check at the reverted state",
+          "dispatch": "releaser@L2"
+        },
+        {
+          "if": "reverted and verified",
+          "back_to": "bug.feedback-loop",
+          "carry": "the failure evidence as the bug to diagnose"
+        }
+      ]
+    },
+    "fullsuite.run": {
+      "question": "User-triggered full verification \u2014 never on the critical path.",
+      "always": [
+        "Never blocks a PR, a merge, or a deploy. Runs whole-codebase, on main, in a quiet worktree or a Cursor cloud agent."
+      ],
+      "routes": [
+        {
+          "if": "entry",
+          "then": "full suite; results appended to docs/orchestra/STATE.md pointers and reported",
+          "dispatch": "gatekeeper:full@L3"
+        },
+        {
+          "if": "failures found",
+          "then": "each failure becomes an intake item (bug lane), prioritized with the user",
+          "next": "terminal.done"
+        },
+        {
+          "if": "clean",
+          "next": "terminal.done"
+        }
+      ]
+    },
+    "bug.feedback-loop": {
+      "question": "Does a named, already-run, red-capable, fast, deterministic command reproduce it?",
+      "routes": [
+        {
+          "if": "no loop yet",
+          "then": "build one (failing test > curl > CLI diff > headless browser > bisect harness); non-deterministic \u2192 raise and state the reproduction rate first; perf \u2192 measured baseline before any change; no loop possible \u2192 BLOCKED naming what is missing \u2014 do not wait for a chat OK"
+        },
+        {
+          "if": "loop exists",
+          "then": "minimise; 3\u20135 ranked falsifiable hypotheses shown to the user (non-blocking); instrument one variable at a time; fix = one ticket through the execute machinery with the regression test first",
+          "next": "execute.setup"
+        },
+        {
+          "if": "fix verified and diff is trivial",
+          "then": "clean instrumentation; winning hypothesis in the commit message",
+          "next": "terminal.done"
+        }
+      ]
+    },
+    "cleanup.final": {
+      "routes": [
+        {
+          "if": "always",
+          "then": "close any open batch (worktrees inspected/removed, memory committed); verify zero live worktrees, ledger CLOSED, STATE.md rewritten to idle (keeping any 'deferred:' line); expired RESEARCH.md removed",
+          "next": "terminal.done"
+        }
+      ]
+    },
+    "terminal.done": {
+      "states-allowed": [
+        "DONE",
+        "BLOCKED",
+        "NOT-READY",
+        "NEEDS-APPROVAL"
+      ],
+      "routes": [
+        {
+          "if": "declaring DONE",
+          "then": "quote the evidence (commands + exit codes + hashes); when a run/ledger was opened, cleanup.final must have run; standalone reviews, full-suite runs, trivial changes, and pure answers declare DONE with evidence alone"
+        },
+        {
+          "if": "anything blocked/deferred",
+          "then": "name it honestly; never dress one terminal state as another"
+        }
+      ]
+    },
+    "autonomy.loop": {
+      "question": "Unattended mode: is there an unfinished ledger item and budget left?",
+      "always": [
+        "A ledger file (docs/plans/<feature>-ledger.md, or the path STATE.md points at) must exist; otherwise NOT-READY \u2014 autonomy cannot start without a plan.",
+        "Cursor may merge. A host block-pr-merge.sh rail is a defect \u2014 install.sh strips it. After pr-reviewer CLEAN the releaser lands and deploys; do not wait for a human.",
+        "Never invent work: the loop only advances items already in the plan's ledger. Extra ideas go to the polish queue \u2014 do not stop for the user.",
+        "Each pass is a fresh dispatch through the normal chain (execute.ticket-loop \u2192 execute.review \u2192 gates.fast); autonomy changes WHO decides to continue, never WHAT the roles do.",
+        "A ledger item flips to done only on evidence (command + exit code). Flipping without evidence is the one tamper rule.",
+        "CONTEXT CHECK (boundary duty): if fill is over 40%, apply `context_discipline` before dispatching the next wave \u2014 continue / clear / handoff / subagent / compact, first yes wins."
+      ],
+      "routes": [
+        {
+          "if": "no ledger file exists",
+          "then": "NOT-READY \u2014 leave this state; autonomy cannot start without a plan"
+        },
+        {
+          "if": "entry",
+          "then": "record caps (user-stated or defaults: max passes 20, consecutive no-progress 2). After pr-reviewer CLEAN, releaser lands and deploys \u2014 that CLEAN is authorization, not a second chat OK. Do not halt for deploy. Full e2e is never in this loop. Announce the caps on the first pass."
+        },
+        {
+          "if": "an unblocked ledger item remains and caps are not hit",
+          "then": "run one pass through the normal chain, record the result, loop",
+          "loop": "autonomy.loop"
+        },
+        {
+          "if": "two consecutive passes produce no new completed item, or the same failure signature repeats",
+          "then": "STALLED \u2014 stop and report; a loop that is not converging burns budget without learning"
+        },
+        {
+          "if": "a pass needs a land or deploy action",
+          "then": "releaser executes it after pr-reviewer CLEAN; do not halt for a chat OK. Destructive git stays deny. Host MCP apply_migration stays denied if that rail exists."
+        },
+        {
+          "if": "a finding contradicts the plan or spec, or new scope appears",
+          "then": "orchestrator adjudicates: original request wins; park extras on the polish queue; do not stop unless a frontier decision the request never settled appears"
+        },
+        {
+          "if": "caps hit",
+          "then": "EXHAUSTED \u2014 report what completed, what remains, and the next action"
+        },
+        {
+          "if": "every ledger item is done",
+          "next": "review.pr"
+        }
+      ]
+    }
+  },
+  "interrupts": {
+    "user changes a ruling mid-run": {
+      "then": "record the resume point (ledger + STATE.md); settle in-flight dispatches per the ledger; architect L1 revision of the spec carrying the new ruling verbatim -> design.gate (spot-check, no user OK); then planner Repair scoped to the affected tickets only -> plan.redteam re-dispatching ONLY the touched lenses; then re-enter execute.ticket-loop at the recorded resume point",
+      "back_to": "design.gate",
+      "carry": "the new ruling verbatim + the recorded resume point"
+    },
+    "user interrupt during execution": {
+      "then": "stop dispatching; report ledger state; resume from the ledger \u2014 never re-dispatch blind (two builders on one ticket in one tree is corruption)"
+    },
+    "a dispatch errors or never returns": {
+      "then": "check the ledger and tree for partial commits, then dispatch fresh; liveness for background agents = state file + mtime at the verified sub-agent state path"
+    }
+  },
+  "invariants": [
+    "Sub-agent briefs are self-contained: verbatim-critical excerpts (rulings, done_when, path rules) pasted; bulk material passed as pointers the agent reads itself.",
+    "Sub-agents never spawn sub-agents, including more of their own role (policy; subagentStart hook denies it). All fan-out is the orchestrator's: N concurrent instances of one role per wave, as the plan names.",
+    "User rulings travel verbatim \u2014 full quote only when it fits one line, else pointer; never a trimmed quote.",
+    "Evidence = command + exit code (captured without pipes) or both-theme screenshots; assertions are not evidence.",
+    "Worktrees only for 2+ concurrent editors; created, integrated, and removed by the orchestrator within the wave.",
+    "Judgement roles (architect, planner, red-teamer, auditor, builder-max, pr-reviewer) run model: inherit \u2014 the ceiling; the rest are pinned lower at install (install.sh verifies).",
+    "Approval boundaries: destructive git is deny. The hook never returns ask. pr-reviewer CLEAN + matching last_green_hash is merge and deploy authorization (including headless). Without CLEAN, protected landings and declared deploys are deny. The only user-facing stop after intake is design.frontier for decisions the request did not settle. Specs, plans, reviews, merges, and deploys do not wait. Full e2e is never in the execute/review/release chain.",
+    "Memory lands in the batch-closing commit; stale entries are pruned, not superseded-in-place.",
+    "Honest terminal states \u2014 DONE, BLOCKED, NOT-READY, NEEDS-APPROVAL; never one dressed as another.",
+    "Every transition announced: `flow: <from> -> <to> (<matched if>)`."
+  ],
+  "cloud": {
+    "topology": "DEFAULT (A): one cloud agent IS the orchestrator; its sub-agents are children inside that same VM, sharing one clone. Everything in this graph applies unchanged. ALTERNATIVE (B): one cloud agent per independent FEATURE or ticket, each running its own mini-chain and returning a PR. Never split ROLES across VMs \u2014 roles are coupled by handoffs, and every boundary would become a git round-trip.",
+    "worktrees": "Topology A: sub-agents share the VM's single clone and single git index, so the local rule applies unchanged \u2014 2+ concurrent builders get worktrees inside the VM. Topology B: each VM is already an isolated clone; no worktrees.",
+    "handoff": "Topology A: briefs + shared disk, as local. Topology B: nothing but git (pushed branches) and the orchestrator relaying report text \u2014 anything load-bearing must be committed, because gitignored files do not exist in a fresh clone.",
+    "conversation": "A cloud orchestrator cannot hold a live conversation; it reaches the user asynchronously (Slack, web, PR comments). Design and plan are conversations \u2014 run them locally. Execute waves are the natural cloud workload.",
+    "enforcement": "The hook never returns ask. Headless land/deploy is allow when reviews.pr=CLEAN and gates.last_green_hash matches HEAD (write those in-session before the releaser). A fresh clone has no state.json \u2014 seed from docs/orchestra/state.example.json; a protected landing with no CLEAN+fresh record is DENIED. server_side_gate allows host-mediated PR completion. Hooks also do not run during a cloud agent's early read-only turns.",
+    "config": "Repo-level config travels with the clone (.claude/agents, .claude/skills, .claude/settings.json, .cursor/* for Cursor, AGENTS.md). User-level config (~/.cursor/*, ~/.claude/*) does NOT. Keep this package project-scoped."
+  },
+  "context_discipline": "CONTEXT IS CHECKED AT EVERY PHASE BOUNDARY, NOT WHEN IT HURTS (user, 2026-08-31). 40-60% fill is the working ceiling. On crossing 40% at a boundary, choose in this order, FIRST YES WINS: continue (the phase is nearly done) -> clear (nothing unexported is live) -> handoff (write STATE.md + the ledger, then clear) -> subagent (push the rest of the phase out) -> compact (LAST, because it turns this session from a primary source into a lossy summary). This host has real handoffs \u2014 docs/AGENT-MEMORY.md, the ledger, per-ticket briefs and subagent reports all survive a clear \u2014 so clearing is CHEAP here and compaction is rarely the right answer. NEVER clear or compact mid-phase with an unexported design decision live: export it first."
+}

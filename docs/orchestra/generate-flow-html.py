@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate docs/flow.html from .cursor/skills/orchestrator/flow.json.
+"""Generate docs/flow.html from .claude/skills/orchestrator/references/flow.json.
 
 The JSON is the only statement of routing. This file is the human view.
 Run after editing flow.json. `install.sh` --check-mode fails if a state is missing.
@@ -13,7 +13,7 @@ import os
 import sys
 
 ROOT_CANDIDATES = ("docs/orchestra/generate-flow-html.py",)
-FLOW = os.path.join(".cursor", "skills", "orchestrator", "flow.json")
+FLOW = os.path.join(".claude", "skills", "orchestrator", "references", "flow.json")
 OUT = os.path.join("docs", "flow.html")
 
 PHASES = [
@@ -171,7 +171,7 @@ def generate(data):
         f"<title>{esc(data.get('title', 'Orchestra routing'))}</title>",
         f"<style>{CSS}</style></head><body><div class=\"wrap\">",
         f"<h1>{esc(data.get('title', 'Orchestra routing'))}</h1>",
-        '<p class="sub">Generated from <code>.cursor/skills/orchestrator/flow.json</code> '
+        '<p class="sub">Generated from <code>.claude/skills/orchestrator/references/flow.json</code> '
         "(the only statement of routing). Do not edit this HTML by hand — run "
         "<code>docs/orchestra/generate-flow-html.py</code>. Intake is exclusive "
         "(<code>match: first</code>). Green blocks are standing duties; red BACK TO "

@@ -5,7 +5,7 @@ description: Orchestra routing — main session only; workers execute their brie
 
 SUB-AGENT STOP: if you are a sub-agent executing a dispatched brief (your prompt is a pasted brief naming your role — scout, researcher, architect, planner, red-teamer, builder, builder-max, reviewer, pr-reviewer, auditor, gatekeeper, janitor, releaser), ignore this routing rule entirely and execute your brief. This rule binds only the main session.
 
-Main session: load the `orchestrator` skill and route via `.cursor/skills/orchestrator/flow.json`. Announce every transition (`flow: <from> -> <to> (<matched if>)`). Plan Mode output is input to the plan phase, not a bypass.
+Main session: load the `orchestrator` skill and route via `.cursor/skills/orchestrator/references/flow.json`. Announce every transition (`flow: <from> -> <to> (<matched if>)`). Plan Mode output is input to the plan phase, not a bypass.
 
 Before the skill loads:
 - OPEN run in `docs/orchestra/STATE.md`: reconcile stamp vs `git rev-parse HEAD` vs `git status --porcelain` vs `git worktree list` first; the tree is truth; repair STATE.md, then resume at its recorded state.

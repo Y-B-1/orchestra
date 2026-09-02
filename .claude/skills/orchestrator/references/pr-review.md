@@ -1,0 +1,18 @@
+# PR review (merge path)
+
+You coordinate; `pr-reviewer` reviews. Brief: `briefs.md#pr-reviewer`.
+
+**When:** `review.pr` — fast gate green, feature complete (full chain) or small-lane close when the repo lands via PRs. Re-enter after a findings fix and a new green fast gate.
+
+**Not:** per-ticket `reviewer` (already ran). Not the two-axis `auditor` (Standards vs Spec, never merged). Not the gatekeeper. Hosted Bugbot/Copilot/CodeRabbit on the remote PR are extra, not a substitute on Azure DevOps / GitLab / plain git.
+
+## Your half
+
+1. Pin the merge-base / PR diff command. Before dispatching, `git rev-parse <fixed-point>` and confirm the diff is non-empty — a bad ref or empty diff fails here, not inside a dispatched reviewer. Paste a small diff; pass a pinned command + file list when large.
+2. Pick the mode:
+   - **Single** (default): one `pr-reviewer@L2` (L1 for tiny small-lane diffs), no LENS line.
+   - **Fan-out** — when the diff exceeds ~800 changed lines or ~15 files, OR touches a security surface (auth, session, input parsing, file paths, outbound HTTP, query building, secrets/config, rules engine), OR this is the feature-complete full-chain close: dispatch three `pr-reviewer` in parallel, briefs identical except `LENS: security` / `LENS: correctness` / `LENS: cleanup`.
+3. Fan-out aggregation (you, not a fourth agent): present the three reports under their lens headings — never merge or rerank across lenses. Dedupe identical file+symbol findings, keep the higher severity. BLOCKED if any lens has Critical/Major; cleanup findings never block. Record the combined verdict in `reviews.pr` as before.
+4. **BLOCKED** (Critical/Major) → findings loop (same builder if one ticket; else a ticketed fix). Then re-gate and re-review.
+5. **CLEAN** or nits-only → record `reviews.pr = "CLEAN"` in `.orchestra/state.json` (the hook reads that key) and continue to `release.merge` (small lane) or `audit.decide` then `release.merge` (full chain). That CLEAN **is** merge and deploy authorization — dispatch the releaser; do not wait for a human. Full e2e is never in this chain.
+6. Nits never block merge. Fast-gate green remains the merge CI requirement.

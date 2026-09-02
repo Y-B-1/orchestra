@@ -48,22 +48,22 @@
   @media(max-width:640px){ td.if{width:40%} body{padding:1rem .6rem 3rem} }
 </style></head><body><div class="wrap">
 <h1>Orchestra routing graph</h1>
-<p class="sub">Generated from <code>.cursor/skills/orchestrator/flow.json</code> (the only statement of routing). Do not edit this HTML by hand — run <code>docs/orchestra/generate-flow-html.py</code>. Intake is exclusive (<code>match: first</code>). Green blocks are standing duties; red BACK TO rows carry a payload. Autonomy is a first-class state.</p>
+<p class="sub">Generated from <code>.claude/skills/orchestrator/references/flow.json</code> (the only statement of routing). Do not edit this HTML by hand — run <code>docs/orchestra/generate-flow-html.py</code>. Intake is exclusive (<code>match: first</code>). Green blocks are standing duties; red BACK TO rows carry a payload. Autonomy is a first-class state.</p>
 <h2>Roster</h2><div class="roster">
 <div class="state"><h3>orchestrator</h3><p>main session — talks to the user, dispatches everyone, adjudicates, merges, approves, owns memory</p></div>
-<div class="state"><h3>scout</h3><p>.cursor/agents/scout.md</p></div>
-<div class="state"><h3>researcher</h3><p>.cursor/agents/researcher.md</p></div>
-<div class="state"><h3>architect</h3><p>.cursor/agents/architect.md</p></div>
-<div class="state"><h3>planner</h3><p>.cursor/agents/planner.md</p></div>
-<div class="state"><h3>red-teamer</h3><p>.cursor/agents/red-teamer.md</p></div>
-<div class="state"><h3>builder</h3><p>.cursor/agents/builder.md</p></div>
-<div class="state"><h3>builder-max</h3><p>.cursor/agents/builder-max.md</p></div>
-<div class="state"><h3>reviewer</h3><p>.cursor/agents/reviewer.md</p></div>
-<div class="state"><h3>pr-reviewer</h3><p>.cursor/agents/pr-reviewer.md</p></div>
-<div class="state"><h3>auditor</h3><p>.cursor/agents/auditor.md</p></div>
-<div class="state"><h3>gatekeeper</h3><p>.cursor/agents/gatekeeper.md</p></div>
-<div class="state"><h3>janitor</h3><p>.cursor/agents/janitor.md</p></div>
-<div class="state"><h3>releaser</h3><p>.cursor/agents/releaser.md</p></div>
+<div class="state"><h3>scout</h3><p>.claude/agents/scout.md</p></div>
+<div class="state"><h3>researcher</h3><p>.claude/agents/researcher.md</p></div>
+<div class="state"><h3>architect</h3><p>.claude/agents/architect.md</p></div>
+<div class="state"><h3>planner</h3><p>.claude/agents/planner.md</p></div>
+<div class="state"><h3>red-teamer</h3><p>.claude/agents/red-teamer.md</p></div>
+<div class="state"><h3>builder</h3><p>.claude/agents/builder.md</p></div>
+<div class="state"><h3>builder-max</h3><p>.claude/agents/builder-max.md</p></div>
+<div class="state"><h3>reviewer</h3><p>.claude/agents/reviewer.md</p></div>
+<div class="state"><h3>pr-reviewer</h3><p>.claude/agents/pr-reviewer.md</p></div>
+<div class="state"><h3>auditor</h3><p>.claude/agents/auditor.md</p></div>
+<div class="state"><h3>gatekeeper</h3><p>.claude/agents/gatekeeper.md</p></div>
+<div class="state"><h3>janitor</h3><p>.claude/agents/janitor.md</p></div>
+<div class="state"><h3>releaser</h3><p>.claude/agents/releaser.md</p></div>
 </div>
 <h2>Intake</h2><div class="phase">
 <div class="state"><h3>intake</h3>
@@ -329,6 +329,7 @@
 <div class="state"><h3>plan.redteam</h3>
 <p class="q">Do all three lenses return READY?</p>
 <div class="always">Record verdicts, rounds, and run ids into .orchestra/state.json — the plan is not executable without a redteam record.</div>
+<div class="always">CONTEXT CHECK (boundary duty): if fill is over 40%, apply `context_discipline` before dispatching the next wave — continue / clear / handoff / subagent / compact, first yes wins.</div>
 <table>
 <tr>
 <td class="if">entry</td>
@@ -440,6 +441,7 @@
 </div>
 <div class="state"><h3>execute.integrate</h3>
 <p class="q">Are the wave&#x27;s ticket branches merged into the feature branch?</p>
+<div class="always">CONTEXT CHECK (boundary duty): if fill is over 40%, apply `context_discipline` before dispatching the next wave — continue / clear / handoff / subagent / compact, first yes wins.</div>
 <table>
 <tr>
 <td class="if">lone-builder wave (work already on the feature branch)</td>
@@ -462,6 +464,7 @@
 <div class="state"><h3>execute.wave-close</h3>
 <p class="match">match: all</p>
 <div class="always">Rewrite docs/orchestra/STATE.md (stamped).</div>
+<div class="always">CONTEXT CHECK (boundary duty): if fill is over 40%, apply `context_discipline` before dispatching the next wave — continue / clear / handoff / subagent / compact, first yes wins.</div>
 <table>
 <tr>
 <td class="if">worktrees exist or the batch spanned 2+ tickets</td>
@@ -488,6 +491,7 @@
 <div class="always">The orchestrator derives or approves the file→spec mapping and pastes the exact command list — scoping is never the gatekeeper&#x27;s guess.</div>
 <div class="always">Record the report into .orchestra/state.json under gates.reports keyed by commit hash, and on green set gates.last_green_hash to that hash — the hook reads exactly this key.</div>
 <div class="always">Widening is mechanical, not judgment: a diff touching dependency manifests, build/tsconfig, migrations/schema, shared types/tokens, or auth widens the scoped set.</div>
+<div class="always">CONTEXT CHECK (boundary duty): if fill is over 40%, apply `context_discipline` before dispatching the next wave — continue / clear / handoff / subagent / compact, first yes wins.</div>
 <table>
 <tr>
 <td class="if">entry</td>
@@ -617,7 +621,7 @@
 </div>
 <div class="state gate"><h3>release.deploy</h3>
 <p class="q">Did the deploy verify?</p>
-<div class="always">Execute. Do not wait for a chat OK. Push-is-deploy hosts (e.g. azure-migration) already deployed at land.</div>
+<div class="always">Execute. Do not wait for a chat OK. Push-is-deploy hosts (e.g. a host whose land branch is off `protected_branches` and whose CI deploys on push) already deployed at land.</div>
 <table>
 <tr>
 <td class="if">entry</td>
@@ -718,6 +722,7 @@
 <div class="always">Never invent work: the loop only advances items already in the plan&#x27;s ledger. Extra ideas go to the polish queue — do not stop for the user.</div>
 <div class="always">Each pass is a fresh dispatch through the normal chain (execute.ticket-loop → execute.review → gates.fast); autonomy changes WHO decides to continue, never WHAT the roles do.</div>
 <div class="always">A ledger item flips to done only on evidence (command + exit code). Flipping without evidence is the one tamper rule.</div>
+<div class="always">CONTEXT CHECK (boundary duty): if fill is over 40%, apply `context_discipline` before dispatching the next wave — continue / clear / handoff / subagent / compact, first yes wins.</div>
 <table>
 <tr>
 <td class="if">no ledger file exists</td>
@@ -765,7 +770,7 @@
 <tr><td class="if">handoff</td><td class="then">Topology A: briefs + shared disk, as local. Topology B: nothing but git (pushed branches) and the orchestrator relaying report text — anything load-bearing must be committed, because gitignored files do not exist in a fresh clone.</td></tr>
 <tr><td class="if">conversation</td><td class="then">A cloud orchestrator cannot hold a live conversation; it reaches the user asynchronously (Slack, web, PR comments). Design and plan are conversations — run them locally. Execute waves are the natural cloud workload.</td></tr>
 <tr><td class="if">enforcement</td><td class="then">The hook never returns ask. Headless land/deploy is allow when reviews.pr=CLEAN and gates.last_green_hash matches HEAD (write those in-session before the releaser). A fresh clone has no state.json — seed from docs/orchestra/state.example.json; a protected landing with no CLEAN+fresh record is DENIED. server_side_gate allows host-mediated PR completion. Hooks also do not run during a cloud agent&#x27;s early read-only turns.</td></tr>
-<tr><td class="if">config</td><td class="then">Repo-level config travels with the clone (.cursor/agents, .cursor/skills, .cursor/hooks.json, AGENTS.md). User-level config (~/.cursor/*) does NOT. Keep this package project-scoped.</td></tr>
+<tr><td class="if">config</td><td class="then">Repo-level config travels with the clone (.claude/agents, .claude/skills, .claude/settings.json, .cursor/* for Cursor, AGENTS.md). User-level config (~/.cursor/*, ~/.claude/*) does NOT. Keep this package project-scoped.</td></tr>
 </table></div></div>
 <h2>Invariants</h2><div class="inv"><ul>
 <li>Sub-agent briefs are self-contained: verbatim-critical excerpts (rulings, done_when, path rules) pasted; bulk material passed as pointers the agent reads itself.</li>
