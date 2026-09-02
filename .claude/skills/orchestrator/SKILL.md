@@ -136,9 +136,9 @@ finish while a slow one is still working.
    to flatten the array first" is not a barrier; do it inside a stage.
 3. **YAML owns model and effort.** Never pass `model` or `effort` to `agent()`. The role files in
    `.claude/agents/` already carry the matrix, and overriding them silently disables the repair valve
-   — a Sonnet build that returns findings is meant to escalate to Opus, which cannot happen if every
-   agent was already pinned to Opus. (2026-08-31: ~40 agents were run at `opus`/`high`, which breaks
-   the matrix twice over.)
+   — a Sonnet build that returns findings is meant to escalate to builder-max (claude-fable-5-1 low),
+   never Opus (retired, OPUS-0) — the 2026-08-31 incident that once pinned ~40 agents to `opus`/`high`
+   broke the matrix twice over.
 
 **What still runs inline.** A question, a doc read, a one-file reversible edit, and any single unit of
 work with nothing to run beside it. Ultracode raises the default, it does not ban judgement: a

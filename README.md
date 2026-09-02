@@ -1,6 +1,6 @@
 # Orchestra Roster for Claude Code and Cursor
 
-A multi-agent operating system for Cursor: thirteen sub-agent roles, a machine-validated routing graph with three work lanes, deterministic guardrail hooks, bounded working memory, and a verified **merge-mode** installer. Orchestra's chain is design → plan → execute → audit → gates → pr-review → release → cleanup.
+A multi-agent operating system for Claude Code and Cursor: thirteen sub-agent roles, a machine-validated routing graph with three work lanes, deterministic guardrail hooks, bounded working memory, and a verified **merge-mode** installer. Orchestra's chain is design → plan → execute → audit → gates → pr-review → release → cleanup.
 
 The original Claude snapshot is frozen at the sibling folder `orchestra-roster`. **All improvements live in this package** (GitHub: `Y-B-1/orchestra`).
 
@@ -63,7 +63,7 @@ Claude models: `docs/orchestra/claude-models.md`.
 
 Preloads are host data, not package content: a host's `.claude/rules/*.md` is mirrored to `.claude/skills/rule-<name>/SKILL.md`, and only the roles that touch that surface add `skills: [rule-<name>]` to their frontmatter (worked example: `SPEC-claude-native.md` §4.2, in the design record below). Re-run `docs/orchestra/sync-agent-config.py` after editing a host rule; `install.sh` preserves preloads already present on a host agent file.
 
-The design records behind this dual-runtime port live outside the package, at `Y-B-1/equitihub` branch `azure-migration` commit `8e054026` (`docs/orchestra/SPEC-claude-native.md`, `RESEARCH-claude-skills.md`) — the design record's home, not a file this package ships.
+The design records behind this dual-runtime port live outside the package, at `Y-B-1/equitihub@8e054026` (`docs/orchestra/SPEC-claude-native.md`, `RESEARCH-claude-skills.md`) — the design record's home, not a file this package ships.
 
 Naive `cp -R` of this folder over a living host (for example a repo that already has its own `CLAUDE.md` and `hooks.json`) will clobber that host. Use `install.sh`.
 

@@ -1333,9 +1333,9 @@ diff -r old/.cursor/skills/orchestrator/SKILL.md new/.cursor/skills/orchestrator
 >    to flatten the array first" is not a barrier; do it inside a stage.
 > 3. **YAML owns model and effort.** Never pass `model` or `effort` to `agent()`. The role files in
 >    `.claude/agents/` already carry the matrix, and overriding them silently disables the repair valve
->    — a Sonnet build that returns findings is meant to escalate to Opus, which cannot happen if every
->    agent was already pinned to Opus. (2026-08-31: ~40 agents were run at `opus`/`high`, which breaks
->    the matrix twice over.)
+>    — a Sonnet build that returns findings is meant to escalate to builder-max (claude-fable-5-1 low),
+>    never Opus (retired, OPUS-0) — the 2026-08-31 incident that once pinned ~40 agents to `opus`/`high`
+>    broke the matrix twice over.
 74c147,149
 < ## Unattended runs (the autonomy loop)
 ---
@@ -1467,10 +1467,41 @@ Only in old/.cursor/skills/orchestrator: STATE.template.md
 Only in old/.cursor/skills/orchestrator: briefs.md
 Only in old/.cursor/skills/orchestrator: flow.json
 diff -r old/.cursor/skills/orchestrator/models.md new/.cursor/skills/orchestrator/models.md
-20c20
+4a5,21
+> ## The role tiering is fixed (user ruling, 2026-08-31)
+> 
+> Ladders below choose the MODEL inside a tier; they do not choose the tier. The
+> tiering itself is settled and identical on both hosts:
+> 
+> - **Judgement** (architect, planner, red-teamer, auditor, reviewer, pr-reviewer)
+>   — the top-intelligence tier at LOW effort. Judgement roles never build.
+> - **Repair** (builder-max) — the judgement tier applied to a build, at low.
+>   Fires only after a review returns findings. A cheap build that failed review
+>   is never retried at the same tier.
+> - **Execution** (builder, gatekeeper, janitor, releaser, researcher) and
+>   **Recon** (scout) — the cheap tiers, because Fable already planned the work.
+> 
+> On Claude Code that reads Fable 5.1 `low` / Sonnet 5 `medium` only — see
+> `docs/orchestra/claude-models.md`. Note that row 3 below still
+> lists `reviewer` under Build; on this repo reviewer is a JUDGEMENT role.
+> 
+9c26
+< 3. Judgement roles (architect, planner, red-teamer, auditor, builder-max, pr-reviewer) stay `model: inherit` so they ride the session ceiling. Do not set `force-default-model` on them.
+---
+> 3. Judgement roles (architect, planner, red-teamer, auditor, reviewer, pr-reviewer) stay `model: inherit` so they ride the session ceiling. Do not set `force-default-model` on them.
+20c37,38
 < | **Judgement** | architect, planner, red-teamer, auditor, builder-max, pr-reviewer | `claude-opus-5[effort=high]` → `claude-fable-5` → `grok-4.6[effort=xhigh]` | Opus 5 lands "on par with Fable 5 on CursorBench at Opus pricing" and often finishes faster — half the cost for the same bench. Reach for Fable 5 only when a decision is genuinely hard. Grok at xhigh is the cheap-pool escape hatch. Inclusive PR review sits here: it is a merge judgement, not a mechanical lint. |
 ---
-> | **Judgement** | architect, planner, red-teamer, auditor, builder-max, pr-reviewer | `claude-opus-5[effort=high]` → `claude-fable-5-1` → `grok-4.6[effort=xhigh]` | Opus 5 lands "on par with Fable 5 on CursorBench at Opus pricing" and often finishes faster — half the cost for the same bench. Reach for Fable 5 only when a decision is genuinely hard. Grok at xhigh is the cheap-pool escape hatch. Inclusive PR review sits here: it is a merge judgement, not a mechanical lint. |
+> | **Judgement** | architect, planner, red-teamer, auditor, reviewer, pr-reviewer | `claude-fable-5-1` → `grok-4.6[effort=xhigh]` | Fable 5.1 is the pinned judgement id — never the bare alias. Grok at xhigh is the cheap-pool escape hatch when Fable's pool is exhausted. Inclusive PR review sits here: it is a merge judgement, not a mechanical lint. |
+> | **Repair** | builder-max | `claude-fable-5-1[effort=low]` → `grok-4.6[effort=xhigh]` | The judgement tier applied to a build, fires only after a review returns findings — never a first attempt. Sonnet 5 at `medium` is the build ceiling; nothing higher, for any role. |
+27c45
+< Composer 2.5 $0.5 → $2.5 · Luna $0.2 → $1.2 · Grok 4.6 $2 → $6 · Sol $4 → $20 · Opus 5 $5 → $25 · **Fable 5 $10 → $50** (20x Composer). Fast variants bill roughly 2x, Composer-fast 6x.
+---
+> Composer 2.5 $0.5 → $2.5 · Luna $0.2 → $1.2 · Grok 4.6 $2 → $6 · Sol $4 → $20 · **Fable 5 $10 → $50** (20x Composer). Fast variants bill roughly 2x, Composer-fast 6x.
+31c49
+< Only Grok 4.6 has a documented effort ladder (`xhigh` / `high` / `medium` / `low`); `claude-opus-5[effort=high]` is documented by example. Whether Composer and Fable accept `effort=` is not documented — check the picker. Kimi K3 is hidden by default and may not appear. Cloud agents use a curated model list Cursor does not publish, so re-check the lineup when running there.
+---
+> Only Grok 4.6 has a documented effort ladder (`xhigh` / `high` / `medium` / `low`). Whether Composer and Fable accept `effort=` is not documented — check the picker. Kimi K3 is hidden by default and may not appear. Cloud agents use a curated model list Cursor does not publish, so re-check the lineup when running there.
 Only in new/.cursor/skills/orchestrator: references
 Only in new/.cursor/skills/orchestrator: scripts
 Only in old/.cursor/skills: plan

@@ -654,6 +654,15 @@ if [ "$SRC" = "$DST" ]; then
     | grep -v 'claude-fable-5-1')
   [ -z "$stray_ids" ] || { bad "bare claude-fable-5 id (want the pinned claude-fable-5-1):"; printf '%s\n' "$stray_ids"; }
   unset _m1 _m2 model_pattern stray_ids
+  # OPUS-0 (equitihub RULINGS-2026-09-02-founder.md): Opus is retired
+  # everywhere. A hit is allowed only on a line documenting the retirement
+  # itself — never one that names Opus as a live choice.
+  _o1="op"; _o2="us"
+  opus_pattern="${_o1}${_o2}"
+  opus_hits=$(grep -rniw "$opus_pattern" .claude .cursor CLAUDE.md README.md docs/orchestra/claude-models.md 2>/dev/null \
+    | grep -viE 'retired|2026-08-31|OPUS-0')
+  [ -z "$opus_hits" ] || { bad "Opus named outside a retirement note (OPUS-0):"; printf '%s\n' "$opus_hits"; }
+  unset _o1 _o2 opus_pattern opus_hits
 else
   say "== 4e. No host string leaked / no bare model id — skipped: installing into a host, not the package self-test"
 fi

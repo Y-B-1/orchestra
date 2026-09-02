@@ -23,14 +23,14 @@ now the source of the constitution; `.cursor/skills/` is generated from it by
 ## The ruling (user, 2026-09-02) — supersedes the earlier tiering
 
 Two tiers, and the boundary is **what kind of thinking the role does**, never
-the size of the task. There is no Opus row and no `[1m]` variant anywhere in
-this matrix.
+the size of the task. There is no Opus row (retired, OPUS-0) and no `[1m]`
+variant anywhere in this matrix.
 
 1. **Fable 5.1 at `low` holds every judgement role** — orchestrating, judging,
    advising, planning, red-teaming, adjudicating, reviewing. Fable never
-   builds. Fable 5.1 at `low` also replaces Opus for the builder-max repair
-   valve: the valve is a judgement pass applied to a build, never a bigger
-   builder.
+   builds. Fable 5.1 at `low` also replaces Opus (retired, OPUS-0) for the
+   builder-max repair valve: the valve is a judgement pass applied to a
+   build, never a bigger builder.
 2. **Sonnet 5 carries execution and recon**, at whichever effort the role
    needs — never higher than `medium`, and a `high` justification must be
    written down. The work arrives already planned by Fable; Sonnet + a

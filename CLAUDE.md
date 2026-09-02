@@ -29,7 +29,7 @@ overwrite that host's charter.
 
 When the **orchestrator skill** is loaded (pin it as a Custom Mode so it stays
 on every turn), the **main session** is the orchestrator: it talks to the user,
-dispatches named roles in `.cursor/agents/`, and declares terminal states.
+dispatches named roles in `.claude/agents/`, and declares terminal states.
 Workers are those roles. They are not the orchestrator.
 
 Routing: `.claude/skills/orchestrator/references/flow.json`. Briefs:
