@@ -10,8 +10,11 @@ bad() { say "FAIL: $*"; FAIL=1; }
 SRC="$(cd "$(dirname "$0")" && pwd)"
 DST="$(pwd)"
 
-ORCHESTRA_SKILLS="orchestrator design plan execute diagnose audit gates release cleanup pr-review"
+ORCHESTRA_SKILLS="orchestrator"
 ORCHESTRA_HOOKS="block-dangerous.py block-nested-subagents.py heal-orchestra-docs.py session-start.py"
+# Six travelling .claude/hooks/*.py + their .test.sh (routing-context.md has no test — it's data).
+CLAUDE_HOOKS="block-dangerous.py orchestra-block-nested.py orchestra-session-start.py heal-orchestra-docs.py orchestra-block-worker-skill.py orchestra-worker-context.py"
+CLAUDE_HOOK_TESTS="block-dangerous.test.sh orchestra-block-nested.test.sh orchestra-session-start.test.sh heal-orchestra-docs.test.sh orchestra-block-worker-skill.test.sh orchestra-worker-context.test.sh"
 
 merge_copy() {
   if [ "$SRC" = "$DST" ]; then
@@ -29,6 +32,28 @@ merge_copy() {
       cp -R "$SRC/.cursor/skills/$skill/." "$DST/.cursor/skills/$skill/"
     fi
   done
+  # Legacy 0.3.0 phase dirs: each playbook now lives once, at
+  # orchestrator/references/<phase>.md. Remove the old per-phase skill dirs
+  # so a 0.3.0-installed host does not keep two copies of each playbook.
+  for legacy in design plan execute diagnose audit gates release cleanup pr-review; do
+    if [ -d "$DST/.cursor/skills/$legacy" ]; then
+      rm -rf "$DST/.cursor/skills/$legacy"
+      say "  note: removed legacy .cursor/skills/$legacy (playbook lives at .cursor/skills/orchestrator/references/$legacy.md since 0.4.0)"
+    fi
+  done
+  # cp -R never prunes: a 0.3.0 host's top-level orchestrator/{flow.json,briefs.md,
+  # STATE.template.md} are byte-identical stale copies once the tree above moved
+  # them under references/ — remove them explicitly (r3-2).
+  for stale in flow.json briefs.md STATE.template.md; do
+    if [ -f "$DST/.cursor/skills/orchestrator/$stale" ]; then
+      rm -f "$DST/.cursor/skills/orchestrator/$stale"
+      say "  note: removed stale .cursor/skills/orchestrator/$stale (lives at references/$stale since 0.4.0)"
+    fi
+  done
+  if [ -d "$SRC/.cursor/skills/orchestra-rails" ]; then
+    mkdir -p "$DST/.cursor/skills/orchestra-rails"
+    cp -R "$SRC/.cursor/skills/orchestra-rails/." "$DST/.cursor/skills/orchestra-rails/"
+  fi
   cp "$SRC/.cursor/rules/orchestra-router.mdc" "$DST/.cursor/rules/orchestra-router.mdc"
   for h in $ORCHESTRA_HOOKS; do
     cp "$SRC/.cursor/hooks/$h" "$DST/.cursor/hooks/$h"
@@ -40,18 +65,89 @@ merge_copy() {
     mkdir -p "$DST/docs"
     cp "$SRC/docs/flow.html" "$DST/docs/flow.html"
   fi
-  # Claude Code runtime (second harness, same graph). Never copy .claude/skills/
-  # — Cursor also loads that directory; a second orchestrator skill would fork the OS.
-  mkdir -p "$DST/.claude/agents" "$DST/.claude/hooks"
-  if [ -d "$SRC/.claude/agents" ]; then
-    for f in "$SRC"/.claude/agents/*.md; do
-      [ -f "$f" ] && cp "$f" "$DST/.claude/agents/"
-    done
+  # Claude Code runtime (second harness, same graph; source of the constitution
+  # since 0.4.0 — .cursor/skills/ is generated FROM .claude/skills/, so both may
+  # be present with no fork risk).
+  mkdir -p "$DST/.claude/agents" "$DST/.claude/hooks" "$DST/.claude/skills"
+  if [ -d "$SRC/.claude/skills/orchestrator" ]; then
+    mkdir -p "$DST/.claude/skills/orchestrator"
+    cp -R "$SRC/.claude/skills/orchestrator/." "$DST/.claude/skills/orchestrator/"
   fi
-  for h in orchestra-block-dangerous.py orchestra-block-nested.py orchestra-session-start.py; do
+  if [ -d "$SRC/.claude/skills/orchestra-rails" ]; then
+    mkdir -p "$DST/.claude/skills/orchestra-rails"
+    cp -R "$SRC/.claude/skills/orchestra-rails/." "$DST/.claude/skills/orchestra-rails/"
+  fi
+  # Agent copy is a MERGE, not a clobber: package frontmatter + body, with the
+  # host's existing skills: preloads (rule-* etc.) re-inserted minus names the
+  # package already owns — a hand-edited BODY is backed up, never silently lost.
+  python3 - "$SRC" "$DST" <<'PY'
+import os, re, shutil, sys
+
+src, dst = sys.argv[1], sys.argv[2]
+srcdir = os.path.join(src, ".claude", "agents")
+dstdir = os.path.join(dst, ".claude", "agents")
+os.makedirs(dstdir, exist_ok=True)
+
+
+def split_md(text):
+    if text.startswith("---"):
+        end = text.find("\n---\n", 3)
+        if end != -1:
+            return text[4:end], text[end + 5:]
+    return "", text
+
+
+def skill_names(front):
+    m = re.search(r"^skills:[ \t]*\n((?:[ \t]*-.*\n?)*)", front, re.M)
+    if not m:
+        return []
+    return re.findall(r"-\s*(\S+)", m.group(1))
+
+
+if not os.path.isdir(srcdir):
+    raise SystemExit(0)
+for fn in sorted(os.listdir(srcdir)):
+    if not fn.endswith(".md"):
+        continue
+    pkg_front, pkg_body = split_md(open(os.path.join(srcdir, fn)).read())
+    pkg_names = skill_names(pkg_front)
+    dst_path = os.path.join(dstdir, fn)
+    host_names = []
+    if os.path.isfile(dst_path):
+        host_text = open(dst_path).read()
+        host_front, host_body = split_md(host_text)
+        if host_body.strip() != pkg_body.strip():
+            bdir = os.path.join(dst, ".orchestra", "install-backup")
+            os.makedirs(bdir, exist_ok=True)
+            shutil.copy(dst_path, os.path.join(bdir, fn))
+            print(f"  note: backed up hand-edited .claude/agents/{fn} body to .orchestra/install-backup/{fn}")
+        host_names = [n for n in skill_names(host_front) if n not in pkg_names]
+    all_names = list(dict.fromkeys(list(pkg_names) + host_names))
+    if re.search(r"^skills:", pkg_front, re.M):
+        block = "skills:\n" + "".join(f"  - {n}\n" for n in all_names)
+        new_front = re.sub(r"^skills:[ \t]*\n(?:[ \t]*-.*\n?)*", block, pkg_front, count=1, flags=re.M)
+    else:
+        block = "skills:\n" + "".join(f"  - {n}\n" for n in all_names)
+        new_front = pkg_front.rstrip("\n") + "\n" + block
+    out = "---\n" + new_front.strip("\n") + "\n---\n" + pkg_body
+    open(dst_path, "w").write(out)
+print("merged .claude/agents/*.md (package frontmatter+body; host skills: preloads preserved)")
+PY
+  for h in $CLAUDE_HOOKS; do
     [ -f "$SRC/.claude/hooks/$h" ] && cp "$SRC/.claude/hooks/$h" "$DST/.claude/hooks/$h"
   done
-  [ -f "$SRC/.claude/orchestra-router.md" ] && cp "$SRC/.claude/orchestra-router.md" "$DST/.claude/orchestra-router.md"
+  for t in $CLAUDE_HOOK_TESTS; do
+    [ -f "$SRC/.claude/hooks/$t" ] && cp "$SRC/.claude/hooks/$t" "$DST/.claude/hooks/$t"
+  done
+  [ -f "$SRC/.claude/hooks/routing-context.md" ] && cp "$SRC/.claude/hooks/routing-context.md" "$DST/.claude/hooks/routing-context.md"
+  # Host prune (r3-1 / r3-2 re-walk): everything 0.4.0 no longer ships that an
+  # earlier cp/cp -R left behind on a 0.3.0 host.
+  for stale in .claude/hooks/orchestra-block-dangerous.py .claude/orchestra-router.md docs/orchestra/generate-claude-agents.py; do
+    if [ -e "$DST/$stale" ]; then
+      rm -f "$DST/$stale"
+      say "  note: removed stale $stale (not shipped since 0.4.0)"
+    fi
+  done
   python3 - "$SRC" "$DST" <<'PY'
 import json, os, sys
 src, dst = sys.argv[1], sys.argv[2]
@@ -106,6 +202,43 @@ for event, entries in (frag.get("hooks") or {}).items():
 os.makedirs(os.path.dirname(host_path), exist_ok=True)
 json.dump(host, open(host_path, "w"), indent=2)
 print("merged .claude/settings.json (host entries kept; orchestra Claude hooks upserted)")
+PY
+  # The upsert above keys by basename, so it never removes an entry for a
+  # basename the fragment does not name — a 0.3.0 host keeps orchestra-block-
+  # dangerous.py wired BESIDE the new block-dangerous.py (r3-1). Unwire it.
+  python3 - "$DST" <<'PY'
+import json, os, sys
+path = os.path.join(sys.argv[1], ".claude", "settings.json")
+if not os.path.isfile(path):
+    raise SystemExit(0)
+host = json.load(open(path))
+
+
+def cmd_basename(h):
+    return os.path.basename((h.get("command") or "").replace("\\", "/").replace('"', "").replace("'", ""))
+
+
+changed = False
+for event, entries in list((host.get("hooks") or {}).items()):
+    kept_entries = []
+    for e in entries:
+        if isinstance(e, dict) and "hooks" in e:
+            kept = [h for h in e.get("hooks") or [] if cmd_basename(h) != "orchestra-block-dangerous.py"]
+            if len(kept) != len(e.get("hooks") or []):
+                changed = True
+            if kept:
+                e = dict(e)
+                e["hooks"] = kept
+                kept_entries.append(e)
+        else:
+            if cmd_basename(e) == "orchestra-block-dangerous.py":
+                changed = True
+                continue
+            kept_entries.append(e)
+    host["hooks"][event] = kept_entries
+if changed:
+    json.dump(host, open(path, "w"), indent=2)
+    print("  note: unwired stale orchestra-block-dangerous.py from .claude/settings.json")
 PY
   python3 - "$SRC" "$DST" <<'PY'
 import json, os, sys
@@ -171,15 +304,30 @@ PY
     cp "$SRC/docs/orchestra/AGENT-MEMORY.framework.md" "$DST/docs/AGENT-MEMORY.md"
     say "created docs/AGENT-MEMORY.md from framework"
   fi
+  # A9-2: heal only APPENDS a missing ## Orchestra block — it never rewrites a
+  # filled one, so a 0.3.0 host's charter can keep naming the pre-0.4.0 route.
+  # Never rewrite the host's charter here; just say so.
+  routing_note_printed=0
+  for charter in "$DST/CLAUDE.md" "$DST/AGENTS.md"; do
+    if [ "$routing_note_printed" -eq 0 ] && [ -f "$charter" ] && grep -q '\.cursor/skills/orchestrator/flow\.json' "$charter" 2>/dev/null; then
+      say "note: host charter ## Orchestra block names a path removed in 0.4.0 — update it to .claude/skills/orchestrator/references/flow.json"
+      routing_note_printed=1
+    fi
+  done
 }
 
 merge_copy
 
+say "== 0b. Generate the Cursor mirror from .claude/ (sync-agent-config.py)"
+python3 docs/orchestra/sync-agent-config.py --root "$DST" || bad "sync-agent-config.py failed"
+python3 docs/orchestra/sync-agent-config.py --root "$DST" --check || bad "sync-agent-config.py --check failed after generation"
+
 say "== 1. Hooks executable"
 chmod +x .cursor/hooks/*.py 2>/dev/null || bad "could not chmod .cursor/hooks/*.py"
-chmod +x .claude/hooks/orchestra-*.py 2>/dev/null || bad "could not chmod .claude/hooks/orchestra-*.py"
+chmod +x .claude/hooks/*.py 2>/dev/null || bad "could not chmod .claude/hooks/*.py"
+chmod +x .claude/hooks/*.sh 2>/dev/null || true
 chmod +x docs/orchestra/generate-flow-html.py 2>/dev/null || true
-chmod +x docs/orchestra/generate-claude-agents.py 2>/dev/null || true
+chmod +x docs/orchestra/sync-agent-config.py 2>/dev/null || true
 
 say "== 2. Guardrail self-test (deny + allow)"
 out=$(echo '{"command":"git push --force"}' | ./.cursor/hooks/block-dangerous.py)
@@ -336,8 +484,11 @@ fi
 [ -f CLAUDE.md ] || bad "CLAUDE.md missing (Cursor's AGENTS.md target)"
 # heal refuses a symlink to a file outside the project
 heal_tmp=$(mktemp -d)
-mkdir -p "$heal_tmp/.cursor/hooks" "$heal_tmp/docs/orchestra"
+mkdir -p "$heal_tmp/.cursor/hooks" "$heal_tmp/.claude/hooks" "$heal_tmp/docs/orchestra"
 cp .cursor/hooks/heal-orchestra-docs.py "$heal_tmp/.cursor/hooks/"
+# The Cursor shim resolves the Claude source from __file__ (SPEC §5) — without
+# it beside the shim this case reds on every install.
+cp .claude/hooks/heal-orchestra-docs.py "$heal_tmp/.claude/hooks/"
 cp docs/orchestra/AGENTS.framework.md "$heal_tmp/docs/orchestra/"
 cp docs/orchestra/AGENT-MEMORY.framework.md "$heal_tmp/docs/orchestra/" 2>/dev/null || true
 ln -s "$HOME/.claude/CLAUDE.md" "$heal_tmp/AGENTS.md"
@@ -363,85 +514,89 @@ for f in architect planner red-teamer auditor builder-max pr-reviewer; do
 done
 grep -q '^is_background: true' .cursor/agents/researcher.md && bad "researcher.md must not force is_background: true (intake Q&A is foreground)"
 
-say "== 4c. Claude layer (agents + models + no second orchestrator skill)"
-[ -d .claude/skills/orchestrator ] && bad ".claude/skills/orchestrator exists — Cursor would load a second OS. Delete it; Claude reads .cursor/skills/orchestrator/SKILL.md"
-python3 docs/orchestra/generate-claude-agents.py >/dev/null || bad "generate-claude-agents.py failed"
-python3 - <<'PY' || FAIL=1
-import os, re, sys
-ok = True
-
-def split_md(text):
-    if text.startswith("---"):
-        end = text.find("\n---\n", 3)
-        if end != -1:
-            return text[4:end], text[end + 5:]
-    return "", text
-
-def fm(front, key):
-    m = re.search(rf"^{key}:\s*(.+)$", front, re.M)
-    return m.group(1).strip() if m else ""
-
-matrix = {
-    "architect": ("claude-fable-5-1", "low"),
-    "planner": ("claude-fable-5-1", "low"),
-    "red-teamer": ("claude-fable-5-1", "low"),
-    "auditor": ("claude-fable-5-1", "low"),
-    "builder-max": ("claude-fable-5-1", "low"),
-    "pr-reviewer": ("claude-fable-5-1", "low"),
-    "scout": ("claude-sonnet-5", "low"),
-    "researcher": ("claude-sonnet-5", "medium"),
-    "reviewer": ("claude-fable-5-1", "low"),
-    "builder": ("claude-sonnet-5", "medium"),
-    "gatekeeper": ("claude-sonnet-5", "medium"),
-    "janitor": ("claude-sonnet-5", "medium"),
-    "releaser": ("claude-sonnet-5", "medium"),
-}
-for role, (model, effort) in matrix.items():
-    cpath = f".cursor/agents/{role}.md"
-    lpath = f".claude/agents/{role}.md"
-    if not os.path.isfile(cpath) or not os.path.isfile(lpath):
-        print(f"FAIL: missing agent pair for {role}")
-        ok = False
-        continue
-    _, cb = split_md(open(cpath).read())
-    lf, lb = split_md(open(lpath).read())
-    if cb.strip() != lb.strip():
-        print(f"FAIL: {role} Cursor/Claude bodies differ")
-        ok = False
-    if fm(lf, "model") != model:
-        print(f"FAIL: {role} model {fm(lf, 'model')!r} want {model}")
-        ok = False
-    if fm(lf, "effort") != effort:
-        print(f"FAIL: {role} effort {fm(lf, 'effort')!r} want {effort}")
-        ok = False
-    if "Agent" not in fm(lf, "disallowedTools"):
-        print(f"FAIL: {role} missing disallowedTools: Agent")
-        ok = False
-    if "force-default-model" in lf or "grok-4.6" in lf or "composer-2.5" in lf:
-        print(f"FAIL: {role} Claude file carries Cursor YAML")
-        ok = False
-sys.exit(0 if ok else 1)
-PY
+say "== 4c. Claude layer + Cursor mirror drift (sync-agent-config.py --check)"
+[ -f .claude/skills/orchestrator/SKILL.md ] || bad "orchestrator skill missing from .claude/skills/ (Claude is the source since 0.4.0)"
+python3 docs/orchestra/sync-agent-config.py --root "$DST" --check || bad "sync-agent-config.py --check failed"
+[ "$(wc -l < .claude/skills/orchestrator/SKILL.md)" -le 265 ] || bad "orchestrator SKILL.md over the 265-line cap — overflow belongs in references/"
 # Claude hook payloads
-out=$(echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push --force"}}' | python3 .claude/hooks/orchestra-block-dangerous.py)
+out=$(echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push --force"}}' | python3 .claude/hooks/block-dangerous.py)
 echo "$out" | grep -q '"deny"' || bad "Claude force-push not denied: $out"
 out=$(echo '{"hook_event_name":"PreToolUse","tool_name":"Agent","agent_type":"builder"}' | python3 .claude/hooks/orchestra-block-nested.py)
 echo "$out" | grep -q '"deny"' || bad "Claude nested Agent from worker not denied: $out"
 out=$(echo '{"hook_event_name":"PreToolUse","tool_name":"Agent"}' | python3 .claude/hooks/orchestra-block-nested.py)
 echo "$out" | grep -q '"allow"' || bad "Claude Agent from main session denied: $out"
+out=$(echo '{"hook_event_name":"PreToolUse","tool_name":"Skill","agent_id":"child-1","tool_input":{"name":"orchestrator"}}' | python3 .claude/hooks/orchestra-block-worker-skill.py); ec=$?
+[ "$ec" -eq 2 ] || bad "Claude worker Skill load of orchestrator not denied (exit $ec): $out"
+out=$(echo '{"hook_event_name":"SubagentStart"}' | python3 .claude/hooks/orchestra-worker-context.py)
+echo "$out" | grep -q 'Do not load the orchestrator skill' || bad "Claude worker-context missing orchestrator-skill warning: $out"
+out=$(echo '{}' | python3 .claude/hooks/orchestra-session-start.py)
+echo "$out" | grep -q '\.claude/skills/orchestrator/SKILL\.md' || bad "Claude session-start missing .claude/ SKILL.md pointer: $out"
+echo "$out" | grep -q '\.cursor/skills/orchestrator/SKILL\.md' && bad "Claude session-start still points at .cursor/ SKILL.md: $out"
 
-say "== 4b. Phase skills locked (disable-model-invocation)"
+say "== 4d. Every travelling .test.sh runs green from its copied location"
+for t in $CLAUDE_HOOK_TESTS .claude/skills/orchestrator/scripts/flow-state.test.sh; do
+  case "$t" in
+    .claude/*) p="$t" ;;
+    *) p=".claude/hooks/$t" ;;
+  esac
+  [ -f "$p" ] || { bad "missing travelling test $p"; continue; }
+  (cd "$DST" && bash "$p") >/tmp/orchestra-4d-$$.log 2>&1
+  ec=$?
+  if [ "$ec" -ne 0 ]; then
+    bad "$p exited $ec"
+    tail -5 /tmp/orchestra-4d-$$.log
+  fi
+  rm -f /tmp/orchestra-4d-$$.log
+done
+grep -q DOCTOR_STUB .claude/hooks/orchestra-session-start.test.sh || bad "session-start test lacks the claude stub (P1) — reds on hosts without claude"
+
+say "== 4e. No host string leaked into the package (arm 12); no bare model id (arm 14)"
+# Every banned word below is split across two fragments on its own line so
+# this arm's own source never contains the substring contiguously — a grep
+# that could match its own pattern line is not a check (CLAUDE.md).
+_p1="azure-mig"; _p2="ration"
+_p3="hub_mi";    _p4="grator"
+_p5="supa";      _p6="base/"
+_p7="41";        _p8="73"
+_p9="dev";       _p10="ops"
+_p11="vite";     _p12="st"
+_p13="np";       _p14="x"
+host_pattern="${_p1}${_p2}|${_p3}${_p4}|${_p5}${_p6}|${_p7}${_p8}|(^|[^A-Za-z0-9_-])${_p9}${_p10}(\$|[^A-Za-z0-9_-])|${_p11}${_p12}|${_p13}${_p14}"
+host_hits=$(grep -rnE "$host_pattern" .claude .cursor docs/orchestra install.sh 2>/dev/null \
+  | grep -v '^docs/orchestra/HOOKS\.md:' \
+  | grep -v '^docs/orchestra/fixtures/')
+[ -z "$host_hits" ] || { bad "host string leaked into the package:"; printf '%s\n' "$host_hits"; }
+unset _p1 _p2 _p3 _p4 _p5 _p6 _p7 _p8 _p9 _p10 _p11 _p12 _p13 _p14 host_pattern host_hits
+# .cursor/skills/orchestrator/models.md is CURSOR_ONLY, hand-maintained data
+# unchanged since before this port (verified byte-identical at 5860b59) — its
+# generic family name (no pinned -1 suffix) predates the U8 port and is not a
+# shape this ticket owns; excluded the same way HOOKS.md's pre-existing
+# example rows are excluded above.
+_m1="claude-fable-"; _m2="5"
+model_pattern="${_m1}${_m2}"
+stray_ids=$(grep -rnw "$model_pattern" .claude .cursor install.sh 2>/dev/null \
+  | grep -v 'claude-fable-5-1' \
+  | grep -v '^\.cursor/skills/orchestrator/models\.md:')
+[ -z "$stray_ids" ] || { bad "bare claude-fable-5 id (want the pinned claude-fable-5-1):"; printf '%s\n' "$stray_ids"; }
+unset _m1 _m2 model_pattern stray_ids
+
+say "== 4b. Phase skill locked (disable-model-invocation); main-session SKILL.md is not"
 [ -f "$SRC/VERSION" ] || bad "package VERSION file missing at $SRC/VERSION"
 for skill in $ORCHESTRA_SKILLS; do
   f=".cursor/skills/$skill/SKILL.md"
   [ -f "$f" ] || { bad "missing skill $f"; continue; }
   grep -q '^disable-model-invocation: true' "$f" || bad "$f missing disable-model-invocation: true (workers must not auto-load orchestrator playbooks)"
 done
+# Inverse invariant: the Claude SKILL.md the MAIN SESSION loads by description
+# must NOT carry the flag — that flag is what would make it invisible to the
+# session that is supposed to load it (mutation: add it — the main session
+# goes blind).
+grep -q '^disable-model-invocation: true' .claude/skills/orchestrator/SKILL.md && bad ".claude/skills/orchestrator/SKILL.md carries disable-model-invocation — the main session would never see it"
 
 say "== 5. Graph + reference consistency"
 python3 - <<'PY' || FAIL=1
 import json, re, os, sys
-d = json.load(open('.cursor/skills/orchestrator/flow.json'))
+d = json.load(open('.cursor/skills/orchestrator/references/flow.json'))
 s = set(d['states']); roles = set(d['roles']); ok = True
 if (d.get('states') or {}).get('intake', {}).get('match') != 'first':
     print("FAIL: intake.match must be 'first' (exclusive classification)")
@@ -459,11 +614,11 @@ for role, path in d['roles'].items():
         print(f"FAIL: missing agent file for {role}"); ok = False
 for dead in ('scout-recon', 'research', 'red-team', 'build-wave', 'review-gate'):
     if os.path.isdir(f'.cursor/skills/{dead}'): print(f"FAIL: retired skill present: {dead}"); ok = False
-if not os.path.exists('.cursor/skills/orchestrator/briefs.md'): print("FAIL: briefs.md missing"); ok = False
+if not os.path.exists('.cursor/skills/orchestrator/references/briefs.md'): print("FAIL: briefs.md missing"); ok = False
 if 'review.pr' not in s: print("FAIL: missing review.pr state"); ok = False
 if 'pr-reviewer' not in roles: print("FAIL: missing pr-reviewer role"); ok = False
-if not os.path.exists('.cursor/skills/pr-review/SKILL.md'): print("FAIL: pr-review skill missing"); ok = False
-briefs = open('.cursor/skills/orchestrator/briefs.md').read() if os.path.exists('.cursor/skills/orchestrator/briefs.md') else ''
+if not os.path.exists('.cursor/skills/orchestrator/references/pr-review.md'): print("FAIL: pr-review playbook missing"); ok = False
+briefs = open('.cursor/skills/orchestrator/references/briefs.md').read() if os.path.exists('.cursor/skills/orchestrator/references/briefs.md') else ''
 if '## pr-reviewer' not in briefs: print("FAIL: briefs.md missing ## pr-reviewer"); ok = False
 sys.exit(0 if ok else 1)
 PY
@@ -485,15 +640,20 @@ grep -q '^!\.orchestra/delivery.json' .gitignore || { echo '!.orchestra/delivery
 grep -q '^!\.orchestra/package-version' .gitignore || { echo '!.orchestra/package-version' >> .gitignore; say "tracked .orchestra/package-version exception"; }
 grep -q '^\.cursor/worktrees/' .gitignore || { echo ".cursor/worktrees/" >> .gitignore; say "added .cursor/worktrees/ to .gitignore"; }
 
-say "== 6b. Package version stamp"
-mkdir -p .orchestra
-ver=$(tr -d '[:space:]' < "$SRC/VERSION" 2>/dev/null || echo "unknown")
-{
-  printf '%s\n' "$ver"
-  desc=$(git -C "$SRC" describe --always --abbrev=12 2>/dev/null || true)
-  [ -n "$desc" ] && printf 'git: %s\n' "$desc"
-} > .orchestra/package-version
-say "wrote .orchestra/package-version: $(tr '\n' ' ' < .orchestra/package-version)"
+if [ "$SRC" = "$DST" ]; then
+  say "== 6b. Package version stamp — skipped: source is the target"
+  say "  .orchestra/package-version is hand-written in the package (git describe cannot name the commit that stores its own output)"
+else
+  say "== 6b. Package version stamp"
+  mkdir -p .orchestra
+  ver=$(tr -d '[:space:]' < "$SRC/VERSION" 2>/dev/null || echo "unknown")
+  {
+    printf '%s\n' "$ver"
+    desc=$(git -C "$SRC" describe --always --abbrev=12 2>/dev/null || true)
+    [ -n "$desc" ] && printf 'git: %s\n' "$desc"
+  } > .orchestra/package-version
+  say "wrote .orchestra/package-version: $(tr '\n' ' ' < .orchestra/package-version)"
+fi
 
 say "== 7. Delivery declaration"
 if grep -q 'Delivery: <declare' AGENTS.md 2>/dev/null; then
@@ -506,7 +666,8 @@ fi
 if [ ! -f .orchestra/delivery.json ]; then
   mkdir -p .orchestra
   urls=$(git remote -v 2>/dev/null | awk '{print $2}' | tr '[:upper:]' '[:lower:]')
-  # Dual-remote hosts (GitHub origin + Azure devops): Azure is the land path.
+  # Dual-remote hosts (GitHub origin plus a second Azure DevOps remote): the
+  # Azure DevOps remote is the land path.
   if echo "$urls" | grep -Eq 'dev\.azure\.com|visualstudio\.com'; then
     provider=azure-devops; ssg=false
     echo "$urls" | grep -Eq 'github\.com' && \
@@ -520,7 +681,8 @@ if [ ! -f .orchestra/delivery.json ]; then
   fi
   [ "$provider" = plain-git ] && landing=direct || landing=pr
   # Always default-protect main, never the current working branch. Overnight land
-  # (e.g. Equiti azure-migration) must stay off this list so push is the deploy.
+  # (e.g. a host whose land branch deploys on push) must stay off this list so
+  # push is the deploy.
   printf '{\n  "provider": "%s",\n  "protected_branches": ["main"],\n  "landing": "%s",\n  "server_side_gate": %s,\n  "deploy": { "production": "auto" },\n  "deploy_commands": []\n}\n' \
     "$provider" "$landing" "$ssg" > .orchestra/delivery.json
   say "wrote .orchestra/delivery.json — detected provider: $provider"
