@@ -98,10 +98,15 @@ def split_md(text):
 
 
 def skill_names(front):
+    # Block style: "skills:\n  - a\n  - b\n"
     m = re.search(r"^skills:[ \t]*\n((?:[ \t]*-.*\n?)*)", front, re.M)
-    if not m:
-        return []
-    return re.findall(r"-\s*(\S+)", m.group(1))
+    if m and m.group(1).strip():
+        return re.findall(r"-\s*(\S+)", m.group(1))
+    # Flow style: "skills: [a, b]" — dropped silently before this fix.
+    m = re.search(r"^skills:[ \t]*\[([^\]]*)\]", front, re.M)
+    if m:
+        return [n.strip().strip("'\"") for n in m.group(1).split(",") if n.strip()]
+    return []
 
 
 if not os.path.isdir(srcdir):
@@ -550,35 +555,108 @@ for t in $CLAUDE_HOOK_TESTS .claude/skills/orchestrator/scripts/flow-state.test.
 done
 grep -q DOCTOR_STUB .claude/hooks/orchestra-session-start.test.sh || bad "session-start test lacks the claude stub (P1) — reds on hosts without claude"
 
-say "== 4e. No host string leaked into the package (arm 12); no bare model id (arm 14)"
-# Every banned word below is split across two fragments on its own line so
-# this arm's own source never contains the substring contiguously — a grep
-# that could match its own pattern line is not a check (CLAUDE.md).
-_p1="azure-mig"; _p2="ration"
-_p3="hub_mi";    _p4="grator"
-_p5="supa";      _p6="base/"
-_p7="41";        _p8="73"
-_p9="dev";       _p10="ops"
-_p11="vite";     _p12="st"
-_p13="np";       _p14="x"
-host_pattern="${_p1}${_p2}|${_p3}${_p4}|${_p5}${_p6}|${_p7}${_p8}|(^|[^A-Za-z0-9_-])${_p9}${_p10}(\$|[^A-Za-z0-9_-])|${_p11}${_p12}|${_p13}${_p14}"
-host_hits=$(grep -rnE "$host_pattern" .claude .cursor docs/orchestra install.sh 2>/dev/null \
-  | grep -v '^docs/orchestra/HOOKS\.md:' \
-  | grep -v '^docs/orchestra/fixtures/')
-[ -z "$host_hits" ] || { bad "host string leaked into the package:"; printf '%s\n' "$host_hits"; }
-unset _p1 _p2 _p3 _p4 _p5 _p6 _p7 _p8 _p9 _p10 _p11 _p12 _p13 _p14 host_pattern host_hits
-# .cursor/skills/orchestrator/models.md is CURSOR_ONLY, hand-maintained data
-# unchanged since before this port (verified byte-identical at 5860b59) — its
-# generic family name (no pinned -1 suffix) predates the U8 port and is not a
-# shape this ticket owns; excluded the same way HOOKS.md's pre-existing
-# example rows are excluded above.
-_m1="claude-fable-"; _m2="5"
-model_pattern="${_m1}${_m2}"
-stray_ids=$(grep -rnw "$model_pattern" .claude .cursor install.sh 2>/dev/null \
-  | grep -v 'claude-fable-5-1' \
-  | grep -v '^\.cursor/skills/orchestrator/models\.md:')
-[ -z "$stray_ids" ] || { bad "bare claude-fable-5 id (want the pinned claude-fable-5-1):"; printf '%s\n' "$stray_ids"; }
-unset _m1 _m2 model_pattern stray_ids
+say "== 4d2. Hook-mirror set (arm 9): every PACKAGE guard wired on one side is wired on the other, or named with a reason"
+CLAUDE_HOOKS="$CLAUDE_HOOKS" ORCHESTRA_HOOKS="$ORCHESTRA_HOOKS" python3 - <<'PY' || FAIL=1
+import json, os, sys
+
+# Genuinely one-sided: the triggering hook event does not exist on the other runtime.
+CLAUDE_ONLY = {
+    "orchestra-block-worker-skill.py": "Cursor has no beforeSkillExecution hook event",
+    "orchestra-worker-context.py": "Cursor has no SubagentStart hook event",
+}
+CURSOR_ONLY = {}
+# Same guard, renamed across runtimes — intentional, not a one-sided gap.
+RENAMED = {
+    "orchestra-block-nested.py": "block-nested-subagents.py",
+    "orchestra-session-start.py": "session-start.py",
+}
+RENAMED_REV = {v: k for k, v in RENAMED.items()}
+# Skill files (not Bash guards): orchestrator/models.md is CURSOR_ONLY,
+# hand-maintained (A24) — covered by sync-agent-config.py's own
+# CURSOR_ONLY_FILES, checked by --check at == 4c above, not repeated here.
+
+def claude_basenames(path):
+    if not os.path.isfile(path):
+        return set()
+    d = json.load(open(path))
+    out = set()
+    for event_entries in d.get("hooks", {}).values():
+        for entry in event_entries:
+            for h in entry.get("hooks", [entry]):
+                if "command" in h:
+                    out.add(os.path.basename(h["command"]))
+    return out
+
+def cursor_basenames(path):
+    if not os.path.isfile(path):
+        return set()
+    d = json.load(open(path))
+    out = set()
+    for event_entries in d.get("hooks", {}).values():
+        for e in event_entries:
+            if "command" in e:
+                out.add(os.path.basename(e["command"]))
+    return out
+
+# Scope this arm to the PACKAGE's own hooks — a host's own guards
+# (guard-model.py, require-open-run.py, ...) are that host's business, not
+# checked here.
+package_claude = set(os.environ["CLAUDE_HOOKS"].split()) | set(CLAUDE_ONLY) | set(RENAMED)
+package_cursor = set(os.environ["ORCHESTRA_HOOKS"].split()) | set(CURSOR_ONLY) | set(RENAMED.values())
+
+claude_bash = claude_basenames(".claude/settings.json") & package_claude
+cursor_shell = cursor_basenames(".cursor/hooks.json") & package_cursor
+
+ok = True
+for h in claude_bash:
+    if h in cursor_shell or RENAMED.get(h) in cursor_shell:
+        continue
+    if h in CLAUDE_ONLY:
+        continue
+    print(f"FAIL: .claude/settings.json wires {h}, not wired in .cursor/hooks.json and not in CLAUDE_ONLY")
+    ok = False
+for h in cursor_shell:
+    if h in claude_bash or RENAMED_REV.get(h) in claude_bash:
+        continue
+    if h in CURSOR_ONLY:
+        continue
+    print(f"FAIL: .cursor/hooks.json wires {h}, not wired in .claude/settings.json and not in CURSOR_ONLY")
+    ok = False
+sys.exit(0 if ok else 1)
+PY
+
+if [ "$SRC" = "$DST" ]; then
+  say "== 4e. No host string leaked into the package (arm 12); no bare model id (arm 14)"
+  # Every banned word below is split across two fragments on its own line so
+  # this arm's own source never contains the substring contiguously — a grep
+  # that could match its own pattern line is not a check (CLAUDE.md).
+  # SRC = DST only for the package self-test: a host's own rule files must
+  # never trip this — see the guard above.
+  _p1="azure-mig"; _p2="ration"
+  _p3="hub_mi";    _p4="grator"
+  _p5="supa";      _p6="base/"
+  _p7="41";        _p8="73"
+  _p9="dev";       _p10="ops"
+  _p11="vite";     _p12="st"
+  _p13="np";       _p14="x"
+  host_pattern="${_p1}${_p2}|${_p3}${_p4}|${_p5}${_p6}|${_p7}${_p8}|(^|[^A-Za-z0-9_-])${_p9}${_p10}(\$|[^A-Za-z0-9_-])|${_p11}${_p12}|${_p13}${_p14}"
+  host_hits=$(grep -rnE "$host_pattern" .claude .cursor docs/orchestra install.sh 2>/dev/null \
+    | grep -v '^docs/orchestra/HOOKS\.md:' \
+    | grep -v '^docs/orchestra/fixtures/')
+  [ -z "$host_hits" ] || { bad "host string leaked into the package:"; printf '%s\n' "$host_hits"; }
+  unset _p1 _p2 _p3 _p4 _p5 _p6 _p7 _p8 _p9 _p10 _p11 _p12 _p13 _p14 host_pattern host_hits
+  # A24: .cursor/skills/orchestrator/models.md is CURSOR_ONLY, hand-maintained
+  # data, but its family name is now the pinned claude-fable-5-1 like every
+  # other reference — the grep below is literal, no exclusion for this file.
+  _m1="claude-fable-"; _m2="5"
+  model_pattern="${_m1}${_m2}"
+  stray_ids=$(grep -rnw "$model_pattern" .claude .cursor install.sh 2>/dev/null \
+    | grep -v 'claude-fable-5-1')
+  [ -z "$stray_ids" ] || { bad "bare claude-fable-5 id (want the pinned claude-fable-5-1):"; printf '%s\n' "$stray_ids"; }
+  unset _m1 _m2 model_pattern stray_ids
+else
+  say "== 4e. No host string leaked / no bare model id — skipped: installing into a host, not the package self-test"
+fi
 
 say "== 4b. Phase skill locked (disable-model-invocation); main-session SKILL.md is not"
 [ -f "$SRC/VERSION" ] || bad "package VERSION file missing at $SRC/VERSION"
@@ -612,7 +690,8 @@ for k, v in d['states'].items():
 for role, path in d['roles'].items():
     if role != 'orchestrator' and not os.path.exists(path.split(' ')[0]):
         print(f"FAIL: missing agent file for {role}"); ok = False
-for dead in ('scout-recon', 'research', 'red-team', 'build-wave', 'review-gate'):
+for dead in ('scout-recon', 'research', 'red-team', 'build-wave', 'review-gate',
+             'design', 'plan', 'execute', 'diagnose', 'audit', 'gates', 'release', 'cleanup', 'pr-review'):
     if os.path.isdir(f'.cursor/skills/{dead}'): print(f"FAIL: retired skill present: {dead}"); ok = False
 if not os.path.exists('.cursor/skills/orchestrator/references/briefs.md'): print("FAIL: briefs.md missing"); ok = False
 if 'review.pr' not in s: print("FAIL: missing review.pr state"); ok = False
@@ -703,6 +782,7 @@ say "  - If you run cloud agents: confirm headless detection. The hook treats CU
 say "  - Cloud landing/deploy: pr-reviewer CLEAN + matching gates.last_green_hash allows headless PR merge, protected push, and declared deploys. Without that record, those are deny (the hook never returns ask). server_side_gate is the other path — set it true ONLY if a host branch policy already runs the fast set. Do not set it true just because the remote is Azure."
 say "  - Re-run this script after every Cursor update (hook payload schemas can change silently — check .orchestra/hook-failures.log; sessionStart also surfaces it)."
 say "  - Living hosts: this installer merges. It will not overwrite a filled CLAUDE.md, extra skills, or non-orchestra hook entries — except it STRIPS block-pr-merge.sh (Cursor never-merge is incompatible with ralph / pr-reviewer CLEAN land). AGENTS.md is a symlink to project CLAUDE.md — never ~/.claude/CLAUDE.md."
+say "  - Personal-shadow collision: a personal ~/.claude or ~/.cursor agent/skill file sharing a name with a package one (orchestrator, orchestra-rails, any role) silently shadows the installed copy on that machine. This is a per-machine fact, not a package property — install.sh cannot see it; check your personal config directories by hand."
 
 [ "$FAIL" -eq 0 ] && say "INSTALL OK" || say "INSTALL INCOMPLETE — fix the FAIL lines above"
 exit "$FAIL"

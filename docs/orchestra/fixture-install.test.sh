@@ -55,9 +55,13 @@ row2=$(grep -c '^Only in old/.cursor/skills/orchestrator: ' "$FIX/cursor.diff")
 # --- row 9: files that must NEVER appear as an actual diff hunk (CURSOR_ONLY / hand-maintained) ---
 # Scoped to real diff-header/Only-in lines for the exact path — a prose mention
 # of the same path inside an unrelated agent-body hunk is not a hit.
+# models.md is deliberately NOT in this list (A24): it now carries the pinned
+# claude-fable-5-1 id, so its content legitimately differs from the 5860b59
+# baseline this fixture upgrades from — a real, once-off source edit, not
+# something install.sh generates or overwrites.
 row9=$(python3 - "$FIX/cursor.diff" <<'PY'
 import re, sys
-paths = ["skills/orchestrator/models.md", "hooks.json", "hooks/session-start.py", "hooks/block-nested-subagents.py"]
+paths = ["hooks.json", "hooks/session-start.py", "hooks/block-nested-subagents.py"]
 text = open(sys.argv[1]).read()
 hits = []
 for p in paths:
@@ -87,6 +91,51 @@ done
 # --- the CLAUDE.md routing note (A23 #2): printed only on the upgrade, never on the fresh 0.3.0 install ---
 grep -q 'host charter ## Orchestra block names a path removed in 0.4.0' "$FIX/install-new.log" || bad "install-new.log missing the stale-routing-pointer note"
 grep -q 'host charter ## Orchestra block names a path removed in 0.4.0' "$FIX/install-old.log" && bad "install-old.log (fresh 0.3.0 install) unexpectedly prints the stale-routing-pointer note"
+
+# --- §2.2 fixture arm: a host skills: preload survives the agent merge in
+# either YAML style — flow (`skills: [a, b]`) used to be dropped silently.
+# Isolated from the old/new upgrade comparison above so its fixture rule
+# skills never pollute cursor.diff. ---
+SK="$SCRATCH/skillhost"; rm -rf "$SK"; mkdir -p "$SK/.claude/rules"
+mkhost "$SK"
+printf '# x\nRule x body.\n' > "$SK/.claude/rules/x.md"
+printf '# y\nRule y body.\n' > "$SK/.claude/rules/y.md"
+( cd "$SK" && bash "$UP/install.sh" ) > "$FIX/install-sk-0.log" 2>&1; sk0_exit=$?
+[ "$sk0_exit" -eq 0 ] || bad "install.sh exited $sk0_exit seeding the skillhost fixture"
+
+# Replace the package's own block-style `skills:` (already merged in by the
+# seed install above) with a host preload in each YAML style, so the second
+# install below proves the merge reads both styles rather than just adding
+# alongside an untouched block.
+python3 - "$SK/.claude/agents/builder.md" "skills: [rule-x]" <<'PY'
+import re, sys
+p, repl = sys.argv[1], sys.argv[2]
+text = open(p).read()
+end = text.find("\n---\n", 4)
+front, rest = text[4:end], text[end:]
+front = re.sub(r"^skills:[ \t]*\n(?:[ \t]*-.*\n?)*", repl + "\n", front, count=1, flags=re.M)
+open(p, "w").write("---\n" + front + rest)
+PY
+python3 - "$SK/.claude/agents/gatekeeper.md" "skills:\n  - rule-y" <<'PY'
+import re, sys
+p, repl = sys.argv[1], sys.argv[2].replace("\\n", "\n")
+text = open(p).read()
+end = text.find("\n---\n", 4)
+front, rest = text[4:end], text[end:]
+front = re.sub(r"^skills:[ \t]*\n(?:[ \t]*-.*\n?)*", repl + "\n", front, count=1, flags=re.M)
+open(p, "w").write("---\n" + front + rest)
+PY
+
+( cd "$SK" && bash "$UP/install.sh" ) > "$FIX/install-sk-1.log" 2>&1; sk1_exit=$?
+[ "$sk1_exit" -eq 0 ] || { bad "install.sh exited $sk1_exit re-installing over the flow-style/block-style skills: preload"; cat "$FIX/install-sk-1.log"; }
+
+for pair in "builder.md:rule-x" "gatekeeper.md:rule-y"; do
+  af="${pair%%:*}"; host_skill="${pair##*:}"
+  merged="$SK/.claude/agents/$af"
+  n=$(grep -c "^\s*-\s*orchestra-rails\s*\$" "$merged" 2>/dev/null); [ -z "$n" ] && n=0
+  [ "$n" = "1" ] || bad "$af: orchestra-rails should appear exactly once after merge, found $n"
+  grep -qE "^\s*-\s*${host_skill}\s*\$" "$merged" || bad "$af: host preload $host_skill did not survive the merge"
+done
 
 [ "$FAIL" -eq 0 ] && say "FIXTURE OK" || say "FIXTURE FAILED — fix the FAIL lines above"
 exit "$FAIL"

@@ -1466,6 +1466,11 @@ diff -r old/.cursor/skills/orchestrator/SKILL.md new/.cursor/skills/orchestrator
 Only in old/.cursor/skills/orchestrator: STATE.template.md
 Only in old/.cursor/skills/orchestrator: briefs.md
 Only in old/.cursor/skills/orchestrator: flow.json
+diff -r old/.cursor/skills/orchestrator/models.md new/.cursor/skills/orchestrator/models.md
+20c20
+< | **Judgement** | architect, planner, red-teamer, auditor, builder-max, pr-reviewer | `claude-opus-5[effort=high]` → `claude-fable-5` → `grok-4.6[effort=xhigh]` | Opus 5 lands "on par with Fable 5 on CursorBench at Opus pricing" and often finishes faster — half the cost for the same bench. Reach for Fable 5 only when a decision is genuinely hard. Grok at xhigh is the cheap-pool escape hatch. Inclusive PR review sits here: it is a merge judgement, not a mechanical lint. |
+---
+> | **Judgement** | architect, planner, red-teamer, auditor, builder-max, pr-reviewer | `claude-opus-5[effort=high]` → `claude-fable-5-1` → `grok-4.6[effort=xhigh]` | Opus 5 lands "on par with Fable 5 on CursorBench at Opus pricing" and often finishes faster — half the cost for the same bench. Reach for Fable 5 only when a decision is genuinely hard. Grok at xhigh is the cheap-pool escape hatch. Inclusive PR review sits here: it is a merge judgement, not a mechanical lint. |
 Only in new/.cursor/skills/orchestrator: references
 Only in new/.cursor/skills/orchestrator: scripts
 Only in old/.cursor/skills: plan
