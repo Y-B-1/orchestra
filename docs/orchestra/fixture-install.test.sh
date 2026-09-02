@@ -38,42 +38,52 @@ fi
 # `diff -r` itself walks directories in a platform-dependent order (BSD diff on
 # macOS vs GNU diff on Linux, plus locale collation) — the SAME hunks come out
 # in a different sequence on each, which reads as a mismatch against a
-# fixture generated on one platform. So cursor.diff is built canonically
-# here instead: our own recursive walk in a fixed (C-locale, codepoint) sort
-# order at every directory level, one path list valid on any platform,
-# printing the exact `diff -r` line shapes ("Only in X: name",
-# "diff -r old/… new/…" + the plain-diff body from a plain two-file `diff`
-# call, which is order-independent because it names its two files directly).
+# fixture generated on one platform. Worse: even for a SINGLE file pair, GNU
+# diff (Linux) and BSD diff (macOS) choose different, equally valid edit
+# scripts — sorting the walk cannot make their body text equal. So cursor.diff
+# is built canonically here instead: our own recursive walk in a fixed
+# (C-locale, codepoint) sort order at every directory level, and the body for
+# each differing file comes from Python's own difflib.unified_diff — a single
+# algorithm, stable across platforms and Python 3.x versions, never the
+# system `diff` binary. One-sided entries print a plain "Only in a: name" /
+# "Only in b: name" line (a/b standing for the old/new trees, so the line
+# never carries a machine-local path).
 ( cd "$FIX" && python3 - old/.cursor new/.cursor <<'PY' > "$FIX/cursor.diff"
-import filecmp, os, subprocess, sys
+import difflib, filecmp, os, sys
 
 old_root, new_root = sys.argv[1], sys.argv[2]
 saw_diff = False
 
-def walk(old_dir, new_dir):
+def walk(old_dir, new_dir, rel):
     global saw_diff
     old_names = set(os.listdir(old_dir)) if os.path.isdir(old_dir) else set()
     new_names = set(os.listdir(new_dir)) if os.path.isdir(new_dir) else set()
     for name in sorted(old_names | new_names):  # codepoint order == C locale for the ASCII names in this tree
         o, n = os.path.join(old_dir, name), os.path.join(new_dir, name)
+        rel_path = f"{rel}/{name}" if rel else name
+        side_label = f"/{rel}" if rel else ""
         if name in old_names and name not in new_names:
-            print(f"Only in {old_dir}: {name}"); saw_diff = True; continue
+            print(f"Only in a{side_label}: {name}"); saw_diff = True; continue
         if name in new_names and name not in old_names:
-            print(f"Only in {new_dir}: {name}"); saw_diff = True; continue
+            print(f"Only in b{side_label}: {name}"); saw_diff = True; continue
         o_isdir, n_isdir = os.path.isdir(o), os.path.isdir(n)
         if o_isdir and n_isdir:
-            walk(o, n)
+            walk(o, n, rel_path)
         elif o_isdir or n_isdir:
             kind = lambda p, isdir: "directory" if isdir else "regular file"
             print(f"File {o} is a {kind(o, o_isdir)} while file {n} is a {kind(n, n_isdir)}")
             saw_diff = True
         elif not filecmp.cmp(o, n, shallow=False):
             print(f"diff -r {o} {n}")
-            body = subprocess.run(["diff", o, n], capture_output=True, text=True).stdout
-            sys.stdout.write(body)
+            with open(o, encoding="utf-8", errors="surrogateescape") as f:
+                old_lines = f.readlines()
+            with open(n, encoding="utf-8", errors="surrogateescape") as f:
+                new_lines = f.readlines()
+            body = difflib.unified_diff(old_lines, new_lines, fromfile=f"a/{rel_path}", tofile=f"b/{rel_path}", n=3)
+            sys.stdout.writelines(body)
             saw_diff = True
 
-walk(old_root, new_root)
+walk(old_root, new_root, "")
 sys.exit(1 if saw_diff else 0)
 PY
 ); diff_exit=$?; echo "diff-exit:$diff_exit"
@@ -91,8 +101,8 @@ find "$FIX/old" "$FIX/new" -name '__pycache__' -o -name '*.pyc' 2>/dev/null | gr
 [ "$pyc_on_disk" -eq 1 ] || bad "a __pycache__/.pyc file survives on a fixture host"
 
 # --- row-2: the three stale top-level orchestrator files are pruned (r3-2) ---
-row2=$(grep -c '^Only in old/.cursor/skills/orchestrator: ' "$FIX/cursor.diff")
-[ "$row2" = "3" ] || bad "expected 3 'Only in old/.cursor/skills/orchestrator:' lines (flow.json, briefs.md, STATE.template.md), got $row2"
+row2=$(grep -c '^Only in a/skills/orchestrator: ' "$FIX/cursor.diff")
+[ "$row2" = "3" ] || bad "expected 3 'Only in a/skills/orchestrator:' lines (flow.json, briefs.md, STATE.template.md), got $row2"
 
 # --- row 9: files that must NEVER appear as an actual diff hunk (CURSOR_ONLY / hand-maintained) ---
 # Scoped to real diff-header/Only-in lines for the exact path — a prose mention
@@ -110,7 +120,7 @@ for p in paths:
     base = p.rsplit("/", 1)[-1]
     if re.search(rf"^diff -r .*{re.escape(p)} ", text, re.M):
         hits.append(p)
-    if re.search(rf"^Only in (old|new)/\.cursor[^:]*: {re.escape(base)}$", text, re.M):
+    if re.search(rf"^Only in (a|b)[^:]*: {re.escape(base)}$", text, re.M):
         hits.append(p)
 print("\n".join(hits))
 PY
