@@ -137,5 +137,30 @@ for pair in "builder.md:rule-x" "gatekeeper.md:rule-y"; do
   grep -qE "^\s*-\s*${host_skill}\s*\$" "$merged" || bad "$af: host preload $host_skill did not survive the merge"
 done
 
+# --- symlink-mirror arm: a host that mirrors a skill as a directory symlink
+# (.cursor/skills/<x> -> .claude/skills/<x>, the DEVOPS TS generator's
+# SYMLINK_MIRRORS convention) must be SATISFIED as-is: --check exits 0 without
+# the generated-copy banner, and a write pass must never replace the symlink.
+SYML="$SCRATCH/symlinkhost"; rm -rf "$SYML"
+mkdir -p "$SYML/.claude/skills/react-doctor" "$SYML/.cursor/skills"
+mkhost "$SYML"
+printf -- '---\nname: react-doctor\ndescription: test skill for the symlink-mirror arm.\n---\n\nBody.\n' > "$SYML/.claude/skills/react-doctor/SKILL.md"
+ln -s ../../.claude/skills/react-doctor "$SYML/.cursor/skills/react-doctor"
+sym_src_before="$(shasum "$SYML/.claude/skills/react-doctor/SKILL.md" | cut -d" " -f1)"
+
+( cd "$SYML" && python3 "$UP/docs/orchestra/sync-agent-config.py" --root "$SYML" --check ) > "$FIX/symlink-check-before.log" 2>&1; sym_check_before=$?
+[ "$sym_check_before" -eq 0 ] || { bad "sync-agent-config.py --check failed on a host whose react-doctor mirror is a symlink:"; cat "$FIX/symlink-check-before.log"; }
+
+( cd "$SYML" && python3 "$UP/docs/orchestra/sync-agent-config.py" --root "$SYML" ) > "$FIX/symlink-write.log" 2>&1; sym_write_exit=$?
+[ "$sym_write_exit" -eq 0 ] || bad "sync-agent-config.py write pass exited $sym_write_exit on the symlink-mirror host"
+
+[ -L "$SYML/.cursor/skills/react-doctor" ] || bad "write pass replaced the symlink mirror at .cursor/skills/react-doctor with a copy"
+[ "$(readlink "$SYML/.cursor/skills/react-doctor")" = "../../.claude/skills/react-doctor" ] || bad "symlink mirror target changed after the write pass"
+# The real damage a write-through does is to the SOURCE: a directory symlink hands the writer the .claude file.
+[ "$(shasum "$SYML/.claude/skills/react-doctor/SKILL.md" | cut -d" " -f1)" = "$sym_src_before" ] || bad "write pass wrote THROUGH the symlink and changed .claude/skills/react-doctor/SKILL.md"
+
+( cd "$SYML" && python3 "$UP/docs/orchestra/sync-agent-config.py" --root "$SYML" --check ) > "$FIX/symlink-check-after.log" 2>&1; sym_check_after=$?
+[ "$sym_check_after" -eq 0 ] || { bad "sync-agent-config.py --check failed after the write pass on the symlink-mirror host:"; cat "$FIX/symlink-check-after.log"; }
+
 [ "$FAIL" -eq 0 ] && say "FIXTURE OK" || say "FIXTURE FAILED — fix the FAIL lines above"
 exit "$FAIL"

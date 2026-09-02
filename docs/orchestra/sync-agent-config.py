@@ -17,6 +17,15 @@ Steps 1-2 precede 3 because --check in step 3 resolves `skills:` names against w
 steps 1-2 wrote. This script is the SOLE writer of every path above; it never reads a
 generated file as input. A second run is a no-op.
 
+Step 5 exception: a host may mirror a skill (or one file inside it) as a SYMLINK to
+its `.claude/skills/` source instead of a generated copy — one file under two names
+cannot drift, which is strictly stronger than a copy plus a drift check. A generated
+path whose realpath already equals its source file's realpath (the file itself is a
+symlink, or a parent directory is) is SATISFIED as-is: --check does not flag it, and
+write mode never touches it — overwriting it would replace the symlink with a copy
+and reintroduce whatever problem the symlink was avoiding (e.g. a tool that discovers
+both trees seeing the same skill twice).
+
     python3 docs/orchestra/sync-agent-config.py            # write every generated path; print each one
     python3 docs/orchestra/sync-agent-config.py --check    # write nothing; exit 1 listing EVERY drift
     python3 docs/orchestra/sync-agent-config.py --root D   # operate on host D (install.sh passes $DST)
@@ -300,8 +309,17 @@ class Plan:
         self.written: list[str] = []
         self.notes: list[str] = []
 
-    def emit(self, root: str, rel: str, content: bytes, write: bool) -> None:
+    def emit(self, root: str, rel: str, content: bytes, write: bool, source_rel: str | None = None) -> None:
         abs_path = os.path.join(root, rel)
+        if source_rel is not None:
+            src_abs = os.path.join(root, source_rel)
+            if os.path.exists(abs_path) and os.path.exists(src_abs):
+                try:
+                    if os.path.realpath(abs_path) == os.path.realpath(src_abs):
+                        return  # symlink mirror (direct, or via a symlinked
+                        # ancestor dir) resolving to the source file — satisfied.
+                except OSError:
+                    pass
         if os.path.isfile(abs_path):
             with open(abs_path, "rb") as f:
                 current = f.read()
@@ -376,7 +394,13 @@ def run(root: str, write: bool) -> Plan:
             expected[rel] = content
 
         for rel, content in expected.items():
-            plan.emit(root, os.path.join(".cursor", "skills", skill, rel), content, write)
+            plan.emit(
+                root,
+                os.path.join(".cursor", "skills", skill, rel),
+                content,
+                write,
+                source_rel=os.path.join(".claude", "skills", skill, rel),
+            )
 
         # Cursor-only files (hand-maintained): note if missing.
         for rel in exempt:
