@@ -222,6 +222,17 @@ one clone — worktrees apply exactly as locally. One cloud agent per independen
 locally first, then execute through merge and deploy in the same chain. Set `server_side_gate: true`
 only when a branch policy actually runs the fast set.
 
+## Runtime rulings (2026-09-02/03, ported from the reference host)
+
+- **Claude is the orchestrator; Cursor is a WORKER runtime.** A Cursor session takes a
+  dispatched ticket; it never routes, fans out, or runs this skill. The orchestrator setup
+  activates wherever Claude is the main-session agent — Claude Code, Orca, or any harness.
+- **Autonomy is invoked, never inferred**, and belongs to the orchestrator only: an in-session
+  Stop-hook loop with a ledger and terminal sigils, or a host-run detached harness per
+  `references/autonomy-harness.md`. Workers never self-loop.
+- **Model lock**: `guard-model.py` on `PreModelSwitch` denies off-matrix switches;
+  worker dispatch model overrides are denied at `PreToolUse(Agent)`.
+
 ## Cursor-native notes (Cursor only — informational here)
 
 Plan Mode output is input to the plan phase, never a bypass. Pin the mirrored skill as a Custom Mode;

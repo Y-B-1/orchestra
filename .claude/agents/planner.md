@@ -1,7 +1,7 @@
 ---
 name: planner
 description: Orchestrator-dispatched only. Do not auto-delegate. Drafts and repairs the ticketed plan from the approved spec, recon, and research. Docs only.
-model: claude-fable-5-1
+model: claude-fable-5
 effort: low
 disallowedTools: Agent
 skills:

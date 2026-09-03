@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Orchestrator-dispatched only. Do not auto-delegate. Per-ticket review of one builder's diff against that ticket. Builder reports are never evidence.
-model: claude-fable-5-1
+model: claude-fable-5
 effort: low
 disallowedTools: Agent
 skills:

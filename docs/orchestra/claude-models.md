@@ -10,7 +10,7 @@ context; the skill points at it.
 Claude workers live in `.claude/agents/`. Frontmatter `model` + `effort` is
 what Claude Code honors. Aliases `fable` / `sonnet` resolve to the
 current generation; Orchestra pins **generation 5**. Judgement's pinned id is
-`claude-fable-5-1`; never the bare alias.
+`claude-fable-5`; never the bare alias (U14: Fable 5, not 5.1).
 
 ~~This file previously forbade adding `.claude/skills/orchestrator/` and
 pointed Claude at `.cursor/skills/orchestrator/SKILL.md` instead — a second
@@ -48,7 +48,8 @@ Escalation is a role change, never a retry.
 
 | Tier | Roles | Model | Effort | Why |
 |---|---|---|---|---|
-| **Judgement** | architect, planner, red-teamer, auditor, reviewer, pr-reviewer, builder-max | `claude-fable-5-1` | `low` | Design, plan, attack, adjudicate, per-ticket and inclusive merge review, and the repair valve. Every role whose output is a verdict, a brief, or a judged repair. |
+| **Judgement** | architect, planner, red-teamer, auditor, reviewer, pr-reviewer | `claude-fable-5` | `low` | Design, plan, attack, adjudicate, per-ticket and inclusive merge review. Every role whose output is a verdict or a brief. |
+| **Repair** | builder-max | `claude-opus-5` | `medium` | The one Opus in the system (U15, 2026-09-02): fires only after a review returns findings, never as a first attempt. |
 | **Execution** | builder, gatekeeper, janitor, releaser, researcher | `claude-sonnet-5` | `medium` | Planned and directed work: implement one ticket, run named gates, hygiene, land/deploy, read primary sources. `high` only with a written justification; never higher. |
 | **Recon** | scout | `claude-sonnet-5` | `low` | Read-only enumeration and lookup. No judgement in the output. |
 

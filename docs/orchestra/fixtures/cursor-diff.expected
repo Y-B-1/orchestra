@@ -1357,7 +1357,7 @@ Only in b/skills: orchestra-rails
 diff -r old/.cursor/skills/orchestrator/SKILL.md new/.cursor/skills/orchestrator/SKILL.md
 --- a/skills/orchestrator/SKILL.md
 +++ b/skills/orchestrator/SKILL.md
-@@ -1,102 +1,245 @@
+@@ -1,102 +1,256 @@
  ---
  name: orchestrator
 -description: Main session only. Workers never load this. Operating manual for the orchestrator — routing in flow.json, briefs in briefs.md. Load via the always-apply rule, /orchestrator, or Custom Mode.
@@ -1653,6 +1653,17 @@ diff -r old/.cursor/skills/orchestrator/SKILL.md new/.cursor/skills/orchestrator
 +`.orchestra/state.json` is absent. You cannot hold a conversation from the cloud — settle frontier gaps
 +locally first, then execute through merge and deploy in the same chain. Set `server_side_gate: true`
 +only when a branch policy actually runs the fast set.
++
++## Runtime rulings (2026-09-02/03, ported from the reference host)
++
++- **Claude is the orchestrator; Cursor is a WORKER runtime.** A Cursor session takes a
++  dispatched ticket; it never routes, fans out, or runs this skill. The orchestrator setup
++  activates wherever Claude is the main-session agent — Claude Code, Orca, or any harness.
++- **Autonomy is invoked, never inferred**, and belongs to the orchestrator only: an in-session
++  Stop-hook loop with a ledger and terminal sigils, or a host-run detached harness per
++  `references/autonomy-harness.md`. Workers never self-loop.
++- **Model lock**: `guard-model.py` on `PreModelSwitch` denies off-matrix switches;
++  worker dispatch model overrides are denied at `PreToolUse(Agent)`.
 +
 +## Cursor-native notes (Cursor only — informational here)
 +

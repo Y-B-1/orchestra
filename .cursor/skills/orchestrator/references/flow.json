@@ -803,7 +803,9 @@
         "Never invent work: the loop only advances items already in the plan's ledger. Extra ideas go to the polish queue \u2014 do not stop for the user.",
         "Each pass is a fresh dispatch through the normal chain (execute.ticket-loop \u2192 execute.review \u2192 gates.fast); autonomy changes WHO decides to continue, never WHAT the roles do.",
         "A ledger item flips to done only on evidence (command + exit code). Flipping without evidence is the one tamper rule.",
-        "CONTEXT CHECK (boundary duty): if fill is over 40%, apply `context_discipline` before dispatching the next wave \u2014 continue / clear / handoff / subagent / compact, first yes wins."
+        "CONTEXT CHECK (boundary duty): if fill is over 40%, apply `context_discipline` before dispatching the next wave \u2014 continue / clear / handoff / subagent / compact, first yes wins.",
+        "MULTI-PLAN RUNS: a finished plan is a wave boundary, never a run end. When this ledger completes and another plan is READY or re-plan-owed, close the batch normally then open the next plan in the SAME run. Only all-plans-done (or only user-blocked work remaining) ends the run.",
+        "HARNESS-DRIVEN PASSES (scripts/orca-ralph.sh \u2014 see references/autonomy-harness.md): never end a turn waiting on dispatched work \u2014 poll foreground. At the context ceiling, commit state, update STATE.md + ledger, emit `SIGIL: RECYCLE <where>` as the last line, and end the pass; the harness relaunches a fresh coordinator. STALLED and EXHAUSTED are the harness's verdicts, never yours to declare early."
       ],
       "routes": [
         {
@@ -836,7 +838,16 @@
           "then": "EXHAUSTED \u2014 report what completed, what remains, and the next action"
         },
         {
-          "if": "every ledger item is done",
+          "if": "every item in THIS plan's ledger is done and another plan is READY or re-plan-owed",
+          "then": "close this batch (review.pr → land → memory update in the same commit), then open the next plan — READY plans first, then re-plans (planner → one red-team lens → execute; committed recon is reused, never re-scouted) — and continue the run",
+          "loop": "autonomy.loop"
+        },
+        {
+          "if": "an item is blocked on the user (a ruling, credentials, a walkthrough) or needs a gated action",
+          "then": "park it in the ledger with a one-line why and advance the next unblocked item; a blocked ITEM never blocks the RUN. Only when NOTHING unblocked remains anywhere: `SIGIL: BLOCKED-USER <items>` (harness runs) or BLOCKED report (in-session)."
+        },
+        {
+          "if": "every ledger item across every plan in the run is done",
           "next": "review.pr"
         }
       ]
@@ -861,7 +872,7 @@
     "User rulings travel verbatim \u2014 full quote only when it fits one line, else pointer; never a trimmed quote.",
     "Evidence = command + exit code (captured without pipes) or both-theme screenshots; assertions are not evidence.",
     "Worktrees only for 2+ concurrent editors; created, integrated, and removed by the orchestrator within the wave.",
-    "Judgement roles (architect, planner, red-teamer, auditor, builder-max, pr-reviewer) run model: inherit \u2014 the ceiling; the rest are pinned lower at install (install.sh verifies).",
+    "Model pins live in the agent frontmatter, per docs/orchestra/claude-models.md (2026-09-02): judgement roles (architect, planner, red-teamer, auditor, reviewer, pr-reviewer) run claude-fable-5 at low; builder-max is the repair valve on claude-opus-5 at medium; execution runs claude-sonnet-5. Never model: inherit.",
     "Approval boundaries: destructive git is deny. The hook never returns ask. pr-reviewer CLEAN + matching last_green_hash is merge and deploy authorization (including headless). Without CLEAN, protected landings and declared deploys are deny. The only user-facing stop after intake is design.frontier for decisions the request did not settle. Specs, plans, reviews, merges, and deploys do not wait. Full e2e is never in the execute/review/release chain.",
     "Memory lands in the batch-closing commit; stale entries are pruned, not superseded-in-place.",
     "Honest terminal states \u2014 DONE, BLOCKED, NOT-READY, NEEDS-APPROVAL; never one dressed as another.",

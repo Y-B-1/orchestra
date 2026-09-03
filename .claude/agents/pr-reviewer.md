@@ -1,7 +1,7 @@
 ---
 name: pr-reviewer
 description: Orchestrator-dispatched only. Do not auto-delegate. Inclusive whole-PR review after the fast gate, before merge to the protected branch. Not a substitute for the gatekeeper or the per-ticket reviewer.
-model: claude-fable-5-1
+model: claude-fable-5
 effort: low
 disallowedTools: Agent
 skills:

@@ -1,7 +1,7 @@
 ---
 name: red-teamer
 description: Orchestrator-dispatched only. Do not auto-delegate. Fresh-context skeptic; one lens per dispatch (requirements / feasibility / scope / judge).
-model: claude-fable-5-1
+model: claude-fable-5
 effort: low
 disallowedTools: Agent
 skills:

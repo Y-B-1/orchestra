@@ -40,13 +40,13 @@ REGEN_CMD = "python3 docs/orchestra/sync-agent-config.py"
 
 # role -> (model, effort). The Claude-side pool (docs/orchestra/claude-models.md).
 CLAUDE_MATRIX: dict[str, tuple[str, str]] = {
-    "architect": ("claude-fable-5-1", "low"),
-    "planner": ("claude-fable-5-1", "low"),
-    "red-teamer": ("claude-fable-5-1", "low"),
-    "auditor": ("claude-fable-5-1", "low"),
-    "reviewer": ("claude-fable-5-1", "low"),
-    "pr-reviewer": ("claude-fable-5-1", "low"),
-    "builder-max": ("claude-fable-5-1", "low"),
+    "architect": ("claude-fable-5", "low"),
+    "planner": ("claude-fable-5", "low"),
+    "red-teamer": ("claude-fable-5", "low"),
+    "auditor": ("claude-fable-5", "low"),
+    "reviewer": ("claude-fable-5", "low"),
+    "pr-reviewer": ("claude-fable-5", "low"),
+    "builder-max": ("claude-opus-5", "medium"),
     "builder": ("claude-sonnet-5", "medium"),
     "gatekeeper": ("claude-sonnet-5", "medium"),
     "janitor": ("claude-sonnet-5", "medium"),

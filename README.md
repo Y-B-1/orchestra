@@ -2,7 +2,7 @@
 
 A multi-agent operating system for Claude Code and Cursor: thirteen sub-agent roles, a machine-validated routing graph with three work lanes, deterministic guardrail hooks, bounded working memory, and a verified **merge-mode** installer. Orchestra's chain is design → plan → execute → audit → gates → pr-review → release → cleanup.
 
-The original Claude snapshot is frozen at the sibling folder `orchestra-roster`. **All improvements live in this package** (GitHub: `Y-B-1/orchestra`).
+The original Claude snapshot is frozen at the sibling folder `orchestra-roster`. **The reference host is SuperCRM-devops** — improvements land there first and are ported here in the batch-closing sync; this package (GitHub: `Y-B-1/orchestra`) is the portable export.
 
 ## What's in the box
 
