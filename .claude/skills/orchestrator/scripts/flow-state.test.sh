@@ -28,6 +28,12 @@ case "$out" in *'"if"'*) ok "a known state prints its routes";; *) bad "a known 
 # the whole graph must NOT come back for one state
 [ "$(printf '%s' "$out" | wc -c)" -lt 20000 ] && ok "one state is not the whole graph" || bad "one state is not the whole graph" "output >= 20 KB"
 
+echo "=== plan.pickup ==="
+out=$(run plan.pickup); rc=$?
+[ "$rc" -eq 0 ] && ok "plan.pickup exits 0" || bad "plan.pickup exits 0" "exit $rc"
+case "$out" in *scout*) ok "plan.pickup names scout";; *) bad "plan.pickup names scout" "no 'scout'";; esac
+case "$out" in *plan.redteam*) ok "plan.pickup names plan.redteam";; *) bad "plan.pickup names plan.redteam" "no 'plan.redteam'";; esac
+
 echo "=== --meta ==="
 out=$(run --meta roles); rc=$?
 [ "$rc" -eq 0 ] && ok "--meta roles exits 0" || bad "--meta roles exits 0" "exit $rc"

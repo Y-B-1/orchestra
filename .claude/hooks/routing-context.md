@@ -7,11 +7,21 @@ Load the `orchestrator` skill — `.claude/skills/orchestrator/SKILL.md` — bef
 any multi-file change, spec, plan, ticket wave, gate, PR review, merge, deploy,
 or bug hunt.
 
+**Lane table** (size the ITEM, not the message — split, size each, escalate
+only the complex ones):
+
+| Change shape | How to run it |
+| --- | --- |
+| Question, explanation, doc read | Answer directly. No skill, no branch, no gates. |
+| ≤3 files, no cross-cutting risk | Inline. Gates + the e2e specs the change touches. |
+| Multi-file, engine/permission/data, or uncertain | Orchestra (`flow.json`). |
+| Any bug | Orchestra `bug.feedback-loop` — root cause before fix, always. |
+
 **Autonomy invocation (not inferred):** `orchestra autonomy`, `run overnight`,
 `unattended until the ledger is done`, or `ralph` (alias). Requires a ledger.
 Ordinary "keep going" is not it.
 
-The host's path-scoped `.claude/rules/*.md` load on touch in the main session
-only. A rule that constrains a sub-agent must be restated INLINE in that
-sub-agent's brief — path-scoped rules do not travel across a delegation
-boundary.
+Path-scoped rules load on touch: `.claude/rules/pipeline.md`, `e2e.md`,
+`migrations.md`, `engine-boundary.md`. A rule that constrains a sub-agent must
+be restated INLINE in that sub-agent's brief — path-scoped rules do not travel
+across a delegation boundary.

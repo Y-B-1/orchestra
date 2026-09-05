@@ -43,14 +43,17 @@ orchestrator transcribes.
 | `review.ticket` | `reviews.<ticket>` = the fresh reviewer's verdict, and the same line in the ledger. |
 | `gates.fast` | `gates.reports[<commit hash>]` = the report; on green, `gates.last_green_hash` = that hash. |
 | `review.pr` | `reviews.pr` = `CLEAN` or `BLOCKED` (plus worst severity). |
-| `execute.wave-close` | Rewrites `docs/orchestra/STATE.md`, stamped. |
+| `execute.ticket-loop` | Rewrites `docs/orchestra/STATE.md`, stamped at HEAD, line 2 `context: <choice>`, before the first dispatch of a wave. |
+| `execute.wave-close` | Rewrites `docs/orchestra/STATE.md`, stamped, line 2 `context: <choice>`. |
+| `plan.pickup` | Rewrites `docs/orchestra/STATE.md`, stamped, line 2; flips the founder ledger row to PICKING-UP. |
 | `gates.full` | Appends the result pointer to `STATE.md`. |
 
 Two of those keys are **read by a shell hook, not by a human**: `reviews.pr = CLEAN` is what the
 merge guard reads as merge authorization, and a protected-branch push is denied while
 `gates.last_green_hash` differs from HEAD. Writing them casually is granting a permission.
 `gates.last_green_hash` moves for a docs-only commit **only** with the voiding rule stated in the
-report line, because any commit after a green run voids that run as evidence.
+report line, because any commit after a green run voids that run as evidence. The stamp's line-2
+context decision is read by `warn-state-stale.py`, not by a human.
 
 The stamp line is the first line of `STATE.md` and is not optional:
 
@@ -82,3 +85,10 @@ line; otherwise point at it. A trimmed quote is worse than a pointer.
 `STATE.md` is a working-tree file between closes. It is committed only inside batch-closing commits,
 so a diff that carries `STATE.md` alone and nothing else is usually a stamp that got ahead of the
 work it claims.
+
+## Vocabulary
+
+- **Stamp distance** — commits between STATE.md's `written-at` hash and HEAD.
+- **Context decision** — STATE.md line 2, `context: <choice>`; the recorded boundary duty.
+- **Pickup** — the `plan.pickup` pass that re-specs, re-red-teams and re-plans a RE-PLAN ON PICKUP
+  document against the current tree; "re-plan on pickup" is the header stamp, "pickup" the state.

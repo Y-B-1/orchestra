@@ -99,10 +99,10 @@ dispatches in one message, never from backgrounding. Only the researcher may be 
 
 **Worktrees buy isolation and nothing else.** One writer in a checkout → main tree. 2+ concurrent
 writers in one checkout → one worktree each. Read-only fan-out, and one cloud agent per feature →
-never. **`isolation: worktree` branches from the repository's DEFAULT branch.** A host whose work
-lands on a non-default branch must not set it in any agent file; create worktrees explicitly from
-the land branch named in `.orchestra/delivery.json`. If parallelism would collide or a worktree
-proof fails, serialize — a recorded choice, not a habit.
+never. **`isolation: worktree` in agent frontmatter is banned in this repo** — it branches from the
+*default* branch (`main`) rather than the ticket branch the orchestrator is on; create worktrees explicitly from
+the working branch. If parallelism would collide or a worktree proof fails, serialize — a recorded
+choice, not a habit.
 
 ## Ultracode is STANDING. Workflows are the default shape of a phase.
 
@@ -120,7 +120,7 @@ finish while a slow one is still working.
 
 | Phase | Workflow shape |
 | --- | --- |
-| `design.approaches` / `design.spec` | one architect per feature → N red-team **lenses** in parallel → gate on the verdict → repair only what a lens blocked |
+| `design.approaches` / `design.spec` | **founder-mind first** on any user-facing surface (the implementation-space dossier: effort ladder, best-in-class research, user simulation — U21) → one architect per feature, bound to the dossier or recording why it deviates → N red-team **lenses** in parallel → gate on the verdict → repair only what a lens blocked |
 | `plan.draft` / `plan.redteam` | planner per feature → an executability lens that opens the files and checks each ticket's exclusive path list |
 | `execute.ticket-loop` | `pipeline` over tickets: build → review, so ticket B reviews while ticket C still builds. Never a barrier between build and review |
 | `audit.run` / `review.pr` | dimensions in parallel → each finding adversarially verified by its own agent before it is reported |
@@ -136,9 +136,9 @@ finish while a slow one is still working.
    to flatten the array first" is not a barrier; do it inside a stage.
 3. **YAML owns model and effort.** Never pass `model` or `effort` to `agent()`. The role files in
    `.claude/agents/` already carry the matrix, and overriding them silently disables the repair valve
-   — a Sonnet build that returns findings is meant to escalate to builder-max (claude-fable-5-1 low),
-   never Opus (retired, OPUS-0) — the 2026-08-31 incident that once pinned ~40 agents to `opus`/`high`
-   broke the matrix twice over.
+   — a Sonnet build that returns findings is meant to escalate to builder-max's Fable 5 `low`,
+   which cannot happen if every agent was already pinned to the same tier. (2026-08-31: ~40 agents
+   were run off-matrix at a raised effort, which breaks the matrix twice over.)
 
 **What still runs inline.** A question, a doc read, a one-file reversible edit, and any single unit of
 work with nothing to run beside it. Ultracode raises the default, it does not ban judgement: a
@@ -146,7 +146,7 @@ workflow whose every stage has width 1 is a sequence of `Agent` calls wearing a 
 
 ## Consulting the graph
 
-**`references/flow.json` is the only statement of routing**, and it is ~48 KB / 30 states — never read
+**`references/flow.json` is the only statement of routing**, and it is ~48 KB / 31 states — never read
 it whole. Read one block at a time (quote the path; this repo's checkout contains a space):
 
 ```
@@ -166,7 +166,7 @@ fires every matching route, at most one naming `next`; `always` duties fire on e
 
 | File | Your duty |
 |---|---|
-| `docs/orchestra/STATE.md` | Working memory, you are the sole writer. Pointers, not content. Rewrite at wave/batch closes and before deliberate stops, stamped `written-at: <timestamp> @ <git HEAD>`. Working-tree file — committed only inside batch-closing commits. Over 120 lines means you are duplicating content that has a home elsewhere. |
+| `docs/orchestra/STATE.md` | Working memory, you are the sole writer. Pointers, not content. Rewrite at wave/batch closes and before deliberate stops, stamped `written-at: <timestamp> @ <git HEAD>`. Rewritten at wave open AND wave close, line 2 = context decision (G9 §1, 2026-09-02). Working-tree file — committed only inside batch-closing commits. Over 120 lines means you are duplicating content that has a home elsewhere. |
 | `.orchestra/state.json` | Machine run-record (gitignored): redteam verdicts+rounds, per-ticket review verdicts, gate reports keyed by hash, flake quarantine. Schema: `docs/orchestra/state.example.json` (SessionStart seeds a missing file from it). Cloud clones start empty — put what the next role needs in git or the brief. |
 | `docs/plans/<feature>-ledger.md` | Run state, always a separate file. Paste sub-agent trailer lines (LEDGER / MEMORY-CANDIDATES / OPEN) in verbatim. Stamp CLOSED at archive. |
 | `docs/AGENT-MEMORY.md` | Long-term index. Janitor drafts using **How to fill**; you commit it **in the batch-closing commit**. Update AND prune. |
@@ -188,16 +188,22 @@ its recorded state. That is what makes any session killable at any moment withou
 5. **Adjudication is yours**: findings round 5, red-team repair round 4+, conflicting reports, anything
    contradicting spec or plan → original request wins; park extras on the polish queue.
 6. **Models: YAML is the owner.** Claude Code: `model` + `effort` on `.claude/agents/<role>.md`, per
-   `docs/orchestra/claude-models.md`. Cursor: `model:` on `.cursor/agents/<role>.md`, where Task
-   `model: inherit` overrides YAML unless the file sets `force-default-model: true`, per
-   `.cursor/skills/orchestrator/models.md`. Hold the lineup constant mid-session.
+   `docs/orchestra/claude-models.md`. A NON-CLAUDE worker's model is not YAML at all — it is the
+   `orca orchestration worker-start --model/--effort` flag, from the chain in
+   `docs/orchestra/orca-runtimes.json` (Cursor's pools: `docs/orchestra/cursor-models.md`).
+   Hold the lineup constant mid-session.
 7. **Dispatch-only hiring.** Agent `description` fields are not auto-hire bait. You name the role.
 
 ## Unattended runs (the autonomy loop)
 
 **Invocation is named, never inferred.** Enter `autonomy.loop` only on `orchestra autonomy`,
 `run overnight`, `unattended until the ledger is done`, or `ralph` / `ralph-loop` (aliases for this
-loop) — **and** only when a ledger already exists. "Keep going", "don't stop", "finish this ticket" are
+loop) — **and** only when a ledger already exists. **The loop is IN-SESSION (U23):** on invocation,
+arm it by writing `.orchestra/autonomy.json` (`{"active": true, "passes": 0, "max_passes": 20,
+"streak": 0, "max_streak": 2}`) — the `orchestra-autonomy-loop.sh` Stop hook then re-prompts every
+stop until you write a terminal `"sigil"` (DONE / BLOCKED-USER / NEEDS-APPROVAL / STALLED) or a cap
+trips (EXHAUSTED). Reset `"streak"` to 0 on real progress each pass; increment it on none. The
+detached `scripts/orca-ralph.sh` is a FALLBACK the user invokes deliberately, never the default. "Keep going", "don't stop", "finish this ticket" are
 not autonomy. No ledger → NOT-READY; plan first. Overnight / "I'm going to sleep": do not wait for a
 second confirmation — announce caps and start.
 
@@ -209,6 +215,14 @@ extras go to the polish queue. **Evidence flips an item, nothing else.** Stop ru
 (two passes with nothing newly completed, or a repeating failure signature), BLOCKED (a denied rail),
 EXHAUSTED (caps hit), DONE. Full e2e is never in this loop — only `fullsuite.run` on the user's word.
 
+**Multi-batch runs outlive the session via the harness** (`scripts/orca-ralph.sh`, per-pass prompt
+`scripts/orca-ralph-PROMPT.md`, contract in `references/autonomy-harness.md`): a fresh-context outer
+loop that relaunches the coordinator each pass, with STATE.md + the plan ledgers as the only memory.
+Under it: never end a turn waiting (poll foreground); a blocked item is parked, never run-ending; a
+finished plan opens the next plan in the same run; at the context ceiling commit state and end the
+pass with `SIGIL: RECYCLE`. STALLED/EXHAUSTED are the harness's verdicts. One coordinator per repo —
+do not start the harness while another coordinator session is live on this checkout.
+
 ## Running in the cloud
 
 `--meta cloud` is the contract. You are **one** cloud agent and your sub-agents live in your VM, sharing
@@ -218,29 +232,19 @@ one clone — worktrees apply exactly as locally. One cloud agent per independen
 locally first, then execute through merge and deploy in the same chain. Set `server_side_gate: true`
 only when a branch policy actually runs the fast set.
 
-## Runtime rulings (2026-09-02/03, ported from the reference host)
+## Cursor is a WORKER runtime (user ruling, 2026-09-02)
 
-- **Claude is the orchestrator; Cursor is a WORKER runtime.** A Cursor session takes a
-  dispatched ticket; it never routes, fans out, or runs this skill. The orchestrator setup
-  activates wherever Claude is the main-session agent — Claude Code, Orca, or any harness.
-- **Autonomy is invoked, never inferred**, and belongs to the orchestrator only: an in-session
-  Stop-hook loop with a ledger and terminal sigils, or a host-run detached harness per
-  `references/autonomy-harness.md`. Workers never self-loop.
-- **Model lock**: `guard-model.py` on `PreModelSwitch` denies off-matrix switches;
-  worker dispatch model overrides are denied at `PreToolUse(Agent)`.
-
-## Cursor-native notes (Cursor only — informational here)
-
-Plan Mode output is input to the plan phase, never a bypass. Pin the mirrored skill as a Custom Mode;
-re-run `install.sh` after Cursor updates (hook payloads change). Cursor mirrors keep
-`disable-model-invocation: true` because Cursor has no description-match auto-load and uses
-`.cursor/rules/orchestra-router.mdc` (`alwaysApply`) instead. Cursor 3.5+ may delete unmanaged worktrees.
+This session is the only main session. Cursor takes a DISPATCHED ticket (`orca orchestration
+worker-start --agent cursor`) and executes its brief; it never routes, never fans out. Its
+orchestrator mirror and the `alwaysApply` rule that loaded it are deleted — what remains for a
+Cursor worker is `.cursor/agents/*.md`, the `.cursor/rules/*.mdc` path rules and `.cursor/hooks*`,
+which is exactly the rails a worker needs. Cursor 3.5+ may delete unmanaged worktrees.
 
 ## References — read on demand, never preloaded (files, not skills: a worker cannot invoke them)
 
 | File | What it holds | When to read |
 |---|---|---|
-| `references/flow.json` | The 30-state routing graph | Always via `scripts/flow-state.py`, one block at a time |
+| `references/flow.json` | The 31-state routing graph | Always via `scripts/flow-state.py`, one block at a time |
 | `references/briefs.md` | Dispatch brief templates, per role | Before writing any brief |
 | `references/STATE.template.md` | The shape of `docs/orchestra/STATE.md` | When opening or rewriting a run |
 | `references/design.md` · `plan.md` · `execute.md` · `gates.md` · `pr-review.md` · `audit.md` · `release.md` · `cleanup.md` · `diagnose.md` | The nine phase playbooks | On entering that phase's states |

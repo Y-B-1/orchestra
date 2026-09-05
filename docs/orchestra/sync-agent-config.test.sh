@@ -23,7 +23,7 @@ build_fixture() {
   local dst="$1"
   mkdir -p "$dst/.claude/agents" "$dst/.claude/skills/orchestrator/references" \
            "$dst/.claude/skills/orchestrator/scripts" "$dst/.claude/rules" \
-           "$dst/.cursor/skills/orchestrator"
+           "$dst/.claude/skills/demo"
 
   cat > "$dst/.claude/agents/scout.md" <<'EOF'
 ---
@@ -84,8 +84,12 @@ paths:
 Fixture rule x body text.
 EOF
 
-  cat > "$dst/.cursor/skills/orchestrator/models.md" <<'EOF'
-Fixture Cursor pool economics — hand-maintained, never generated.
+  cat > "$dst/.claude/skills/demo/SKILL.md" <<'EOF'
+---
+name: demo
+description: fixture skill that IS mirrored to Cursor.
+---
+Fixture demo body.
 EOF
 }
 
@@ -124,23 +128,26 @@ check_written ".claude/skills/rule-x/SKILL.md"
 check_written ".cursor/agents/scout.md"
 check_written ".cursor/agents/builder.md"
 check_written ".cursor/rules/x.mdc"
-check_written ".cursor/skills/orchestrator/SKILL.md"
-check_written ".cursor/skills/orchestrator/references/design.md"
-check_written ".cursor/skills/orchestrator/references/standing-rails.md"
-check_written ".cursor/skills/orchestrator/scripts/x.py"
+check_written ".cursor/skills/demo/SKILL.md"
+check_written "bb-plugin/skills/orchestra-rails/SKILL.md"
 check_written ".cursor/skills/orchestra-rails/SKILL.md"
 check_written ".cursor/skills/rule-x/SKILL.md"
 
-echo "=== CURSOR_ONLY_FILES: models.md untouched and skipped ==="
-if grep -q "models.md" "$write_log"; then
-  bad "models.md untouched" "was printed as written"
+echo "=== Cursor is a worker runtime: no orchestrator surface is ever generated ==="
+if [ -e "$ROOT/.cursor/skills/orchestrator" ]; then
+  bad "no .cursor/skills/orchestrator mirror" "the directory was generated"
 else
-  ok "models.md untouched"
+  ok "no .cursor/skills/orchestrator mirror"
 fi
-if grep -q "Fixture Cursor pool economics" "$ROOT/.cursor/skills/orchestrator/models.md"; then
-  ok "models.md content preserved"
+if grep -q "Cursor-excluded" "$write_log"; then
+  ok "exclusion is announced, not silent"
 else
-  bad "models.md content preserved" "content changed"
+  bad "exclusion is announced, not silent" "no note printed"
+fi
+if [ -e "$ROOT/.cursor/rules/orchestra-router.mdc" ]; then
+  bad "no orchestra-router.mdc" "the retired router rule was generated"
+else
+  ok "no orchestra-router.mdc"
 fi
 
 echo "=== --check exit 0 after a clean write ==="
@@ -199,7 +206,8 @@ claude_text = (
 out = mod.render_agent("scout", claude_text, "Rails body.")
 front, _ = mod.split_md(out)
 assert "readonly: true" in front, front
-assert "effort" not in front, front
+assert "\neffort:" not in front, front   # the Claude effort KEY is stripped;
+                                          # "effort=high" inside a Cursor slug is not it
 
 print("OK")
 PY
@@ -214,14 +222,30 @@ fi
 
 echo "=== SPEC arm mutations turn --check red ==="
 
+d="$TMP/arm13a"; cp -r "$ROOT" "$d"
+mkdir -p "$d/.cursor/skills/orchestrator"
+echo "reintroduced" > "$d/.cursor/skills/orchestrator/SKILL.md"
+expect_drift "$d" "arm13a: .cursor/skills/orchestrator reintroduced" ".cursor/skills/orchestrator"
+
+d="$TMP/arm13b"; cp -r "$ROOT" "$d"
+mkdir -p "$d/.cursor/rules"
+echo "alwaysApply: true" > "$d/.cursor/rules/orchestra-router.mdc"
+expect_drift "$d" "arm13b: orchestra-router.mdc reintroduced" "orchestra-router.mdc"
+
+d="$TMP/arm14"; cp -r "$ROOT" "$d"
+mkdir -p "$d/.cursor/agents"
+echo "---" > "$d/.cursor/agents/planner.md"
+expect_drift "$d" "arm14: orphan Cursor agent for a role Cursor never takes" "planner"
+
+
 d="$TMP/arm1"; cp -r "$ROOT" "$d"
 python3 - "$d" <<'PY'
 import sys
-p = sys.argv[1] + "/.cursor/skills/orchestrator/references/design.md"
+p = sys.argv[1] + "/.cursor/skills/demo/SKILL.md"
 t = open(p).read()
 open(p, "w").write(t.replace("Fixture", "Mutated", 1))
 PY
-expect_drift "$d" "arm1: mirror content differs (design.md hand-edited)" "references/design.md"
+expect_drift "$d" "arm1: mirror content differs (demo SKILL.md hand-edited)" ".cursor/skills/demo/SKILL.md"
 
 d="$TMP/arm1b"; cp -r "$ROOT" "$d"
 mkdir -p "$d/.cursor/skills/design"
@@ -307,14 +331,15 @@ PY
 expect_drift "$d" "arm12: agent model/effort mismatches CLAUDE_MATRIX" "scout"
 
 echo "=== minor: missing .cursor/skills/orchestrator/models.md prints a note, exit 0 ==="
-d="$TMP/nomd"; cp -r "$ROOT" "$d"
-rm "$d/.cursor/skills/orchestrator/models.md"
-nomd_out=$(python3 "$GEN" --root "$d" 2>&1)
-nomd_code=$?
-if [ "$nomd_code" -eq 0 ] && echo "$nomd_out" | grep -q "^note:.*models.md"; then
-  ok "missing models.md prints a note, exit 0"
+d="$TMP/stalemodels"; cp -r "$ROOT" "$d"
+mkdir -p "$d/.cursor/skills/orchestrator"
+echo "stale pool economics from 0.5.0" > "$d/.cursor/skills/orchestrator/models.md"
+stale_out=$(python3 "$GEN" --root "$d" --check 2>&1)
+stale_code=$?
+if [ "$stale_code" -ne 0 ] && echo "$stale_out" | grep -q ".cursor/skills/orchestrator"; then
+  ok "a 0.5.0 host's leftover .cursor/skills/orchestrator turns --check red"
 else
-  bad "missing models.md prints a note, exit 0" "exit=$nomd_code out: $nomd_out"
+  bad "a 0.5.0 host's leftover .cursor/skills/orchestrator turns --check red" "exit=$stale_code out: $stale_out"
 fi
 
 echo "=== minor: --root with no value is a usage error, not a traceback ==="

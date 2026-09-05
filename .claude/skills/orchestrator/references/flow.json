@@ -31,8 +31,8 @@
     ".orchestra/state.json": "machine run-record (gitignored) \u2014 exact keys: gates.last_green_hash (the green commit hash; the hook denies protected pushes while it differs from HEAD), gates.reports{<hash>: report}, redteam{verdicts,rounds,run_ids}, reviews{<ticket>: verdict, pr: CLEAN|BLOCKED}, flakes[], subagent_state_path. Written by the orchestrator at the transitions marked here; read by hooks and the janitor.",
     "docs/plans/<feature>-ledger.md": "run state for one plan \u2014 always a separate file, never a section in the plan; CLOSED stamp at archive",
     "docs/AGENT-MEMORY.md": "long-term repo memory \u2014 fill-in index (how-to-fill + Current); janitor drafts and prunes, orchestrator commits in the batch-closing commit; git is the history \u2014 no append-only markers",
-    ".orchestra/delivery.json": "per-repo delivery declaration (COMMITTED, unlike gitignored .orchestra/ files): provider (github | azure-devops | gitlab | plain-git), protected_branches, landing (pr | direct), server_side_gate (host enforces the gate itself), deploy policy per environment (default auto), deploy_commands patterns the hook allows only with CLEAN+fresh. install.sh detects the provider from the remote URL; the orchestrator reads this file before any release action.",
-    ".orchestra/package-version": "install stamp (COMMITTED via gitignore exception): copy of repo-root VERSION plus git describe. Written by install.sh so a host can see which orchestra package it merged."
+    ".orchestra/delivery.json": "per-repo delivery declaration (COMMITTED, unlike gitignored .orchestra/ files): provider (github | azure-devops | gitlab | plain-git), protected_branches, landing (pr | direct), server_side_gate (host enforces the gate itself), deploy policy per environment (default auto), deploy_commands patterns the hook allows only with CLEAN+fresh. The provider is detected from the remote URL at install time (upstream package: Y-B-1/orchestra install.sh; this host was configured by hand); the orchestrator reads this file before any release action.",
+    ".orchestra/package-version": "install stamp (COMMITTED via gitignore exception): copy of repo-root VERSION plus git describe. Written by the upstream package's install.sh so a host can see which orchestra package it merged; absent on a hand-configured host like this one."
   },
   "states": {
     "intake": {
@@ -45,6 +45,10 @@
         {
           "if": "docs/orchestra/STATE.md exists with an OPEN run",
           "then": "reconcile BEFORE acting: compare its stamp to `git rev-parse HEAD`, `git status --porcelain`, `git worktree list`; on mismatch the TREE is truth \u2014 repair STATE.md first, then enter at its recorded state (do not also classify into another lane this turn)"
+        },
+        {
+          "if": "the named plan carries the RE-PLAN ON PICKUP stamp",
+          "next": "plan.pickup"
         },
         {
           "if": "the user invokes Orchestra autonomy with a NAMED trigger \u2014 'orchestra autonomy', 'run overnight', 'unattended until the ledger is done', or 'ralph'/'ralph-loop' as aliases for this loop (not a Charge script) \u2014 AND a ledger exists (docs/plans/<feature>-ledger.md or STATE.md ledger pointer)",
@@ -313,6 +317,19 @@
         }
       ]
     },
+    "plan.pickup": {
+      "always": [
+        "Announce `flow: intake -> plan.pickup (<plan>)`; rewrite STATE.md (stamped, line 2 `context: <choice>`); the founder ledger row flips to PICKING-UP."
+      ],
+      "routes": [
+        {
+          "if": "entry",
+          "then": "scout@L2 runs the pickup-diff brief (briefs.md \u00a7 pickup-scout) against the named spec; architect@L1 then runs a revision pass on the spec with the diff pasted; re-red-team per the standing lens-count ruling \u2014 no shortcut through plan.draft",
+          "dispatch": "scout@L2 -> architect@L1",
+          "next": "plan.redteam"
+        }
+      ]
+    },
     "plan.recon": {
       "question": "Does planning need recon beyond what design already gathered?",
       "routes": [
@@ -411,6 +428,9 @@
     },
     "execute.ticket-loop": {
       "question": "Is there an unblocked ticket?",
+      "always": [
+        "Before the first dispatch of a wave: rewrite docs/orchestra/STATE.md stamped at HEAD, line 2 `context: <choice>` (the boundary decision, order continue \u2192 clear \u2192 handoff \u2192 subagent \u2192 compact)."
+      ],
       "routes": [
         {
           "if": "yes (several independent \u2192 parallel, worktree rule applies)",
@@ -504,7 +524,7 @@
     },
     "execute.wave-close": {
       "always": [
-        "Rewrite docs/orchestra/STATE.md (stamped).",
+        "Rewrite docs/orchestra/STATE.md (stamped, line 2 `context: <choice>`).",
         "CONTEXT CHECK (boundary duty): if fill is over 40%, apply `context_discipline` before dispatching the next wave \u2014 continue / clear / handoff / subagent / compact, first yes wins."
       ],
       "match": "all",
@@ -619,7 +639,7 @@
         {
           "if": "entry",
           "then": "auditor(standards) + auditor(spec) in parallel; small diffs pasted, large diffs passed as the pinned command + file list",
-          "dispatch": "auditor:standards@L2 + auditor:spec@L2"
+          "dispatch": "auditor:standards@L2 + auditor:spec@L2 + auditor:ledger@L2 when the closing ledger row lives in docs/plans/founder/LEDGER.md"
         },
         {
           "if": "a finding contradicts the spec",
@@ -688,7 +708,7 @@
     "release.deploy": {
       "question": "Did the deploy verify?",
       "always": [
-        "Execute. Do not wait for a chat OK. Push-is-deploy hosts (e.g. a host whose land branch is off `protected_branches` and whose CI deploys on push) already deployed at land."
+        "Execute. Do not wait for a chat OK. Push-is-deploy hosts (e.g. main) already deployed at land."
       ],
       "routes": [
         {
@@ -799,7 +819,7 @@
       "question": "Unattended mode: is there an unfinished ledger item and budget left?",
       "always": [
         "A ledger file (docs/plans/<feature>-ledger.md, or the path STATE.md points at) must exist; otherwise NOT-READY \u2014 autonomy cannot start without a plan.",
-        "Cursor may merge. A host block-pr-merge.sh rail is a defect \u2014 install.sh strips it. After pr-reviewer CLEAN the releaser lands and deploys; do not wait for a human.",
+        "Cursor may merge. A host block-pr-merge.sh rail is a defect \u2014 this repo removed it (pr-reviewer CLEAN authorizes land). After pr-reviewer CLEAN the releaser lands and deploys; do not wait for a human.",
         "Never invent work: the loop only advances items already in the plan's ledger. Extra ideas go to the polish queue \u2014 do not stop for the user.",
         "Each pass is a fresh dispatch through the normal chain (execute.ticket-loop \u2192 execute.review \u2192 gates.fast); autonomy changes WHO decides to continue, never WHAT the roles do.",
         "A ledger item flips to done only on evidence (command + exit code). Flipping without evidence is the one tamper rule.",
@@ -849,6 +869,10 @@
         {
           "if": "every ledger item across every plan in the run is done",
           "next": "review.pr"
+        },
+        {
+          "if": "the next ledger item is a founder group (a row in docs/plans/founder/LEDGER.md)",
+          "next": "plan.pickup"
         }
       ]
     }

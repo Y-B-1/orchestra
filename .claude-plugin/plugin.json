@@ -1,0 +1,13 @@
+{
+  "name": "orchestra",
+  "version": "0.6.0",
+  "description": "A multi-agent operating system for coding agents: fourteen dispatch-only worker roles, a machine-validated routing graph, deterministic guardrail hooks, bounded working memory, and an evidence-gated chain from design through deploy. Claude Code and Codex orchestrate; Cursor and OpenCode are worker runtimes.",
+  "author": { "name": "Y-B-1" },
+  "homepage": "https://github.com/Y-B-1/orchestra",
+  "repository": "https://github.com/Y-B-1/orchestra",
+  "license": "MIT",
+  "keywords": ["orchestration", "multi-agent", "subagents", "code-review", "workflow", "codex", "cursor", "opencode"],
+  "agents": "./.claude/agents",
+  "skills": "./.claude/skills",
+  "hooks": "./.claude-plugin/hooks.json"
+}

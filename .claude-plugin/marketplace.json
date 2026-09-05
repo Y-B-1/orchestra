@@ -1,0 +1,11 @@
+{
+  "name": "orchestra",
+  "owner": { "name": "Y-B-1" },
+  "plugins": [
+    {
+      "name": "orchestra",
+      "source": "./",
+      "description": "Multi-agent operating system: 14 worker roles, routing graph, guardrail hooks, evidence-gated chain. Claude Code + Codex orchestrate; Cursor + OpenCode are workers."
+    }
+  ]
+}

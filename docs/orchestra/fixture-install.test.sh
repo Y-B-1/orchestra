@@ -100,17 +100,20 @@ grep -nE '__pycache__|\.pyc\b' "$FIX/cursor.diff" >/dev/null 2>&1; pyc_in_diff=$
 find "$FIX/old" "$FIX/new" -name '__pycache__' -o -name '*.pyc' 2>/dev/null | grep . >/dev/null 2>&1; pyc_on_disk=$?; echo "pyc-on-disk:$pyc_on_disk"
 [ "$pyc_on_disk" -eq 1 ] || bad "a __pycache__/.pyc file survives on a fixture host"
 
-# --- row-2: the three stale top-level orchestrator files are pruned (r3-2) ---
-row2=$(grep -c '^Only in a/skills/orchestrator: ' "$FIX/cursor.diff")
-[ "$row2" = "3" ] || bad "expected 3 'Only in a/skills/orchestrator:' lines (flow.json, briefs.md, STATE.template.md), got $row2"
+# --- row-2 (0.6.0): the whole Cursor orchestrator mirror is retired. A 0.3.0/0.5.0
+# host had `.cursor/skills/orchestrator/`; an upgraded host must not. The mirror
+# is what made "Cursor as orchestrator" one Custom Mode away.
+row2=$(grep -c '^Only in a/skills: orchestrator$' "$FIX/cursor.diff")
+[ "$row2" = "1" ] || bad "the Cursor orchestrator mirror was not retired on upgrade (expected 1 'Only in a/skills: orchestrator', got $row2)"
+[ -e "$FIX/new/.cursor/skills/orchestrator" ] && bad ".cursor/skills/orchestrator survives on the upgraded host"
+[ -e "$FIX/new/.cursor/rules/orchestra-router.mdc" ] && bad ".cursor/rules/orchestra-router.mdc survives on the upgraded host"
 
 # --- row 9: files that must NEVER appear as an actual diff hunk (CURSOR_ONLY / hand-maintained) ---
 # Scoped to real diff-header/Only-in lines for the exact path — a prose mention
 # of the same path inside an unrelated agent-body hunk is not a hit.
-# models.md is deliberately NOT in this list (A24): it now carries the pinned
-# claude-fable-5-1 id, so its content legitimately differs from the 5860b59
-# baseline this fixture upgrades from — a real, once-off source edit, not
-# something install.sh generates or overwrites.
+# models.md is not in this list because it no longer exists: it lived under the
+# Cursor orchestrator mirror, which 0.6.0 retires. Cursor pool economics moved to
+# docs/orchestra/cursor-models.md.
 row9=$(python3 - "$FIX/cursor.diff" <<'PY'
 import re, sys
 paths = ["hooks.json", "hooks/session-start.py", "hooks/block-nested-subagents.py"]
@@ -136,9 +139,8 @@ ls "$FIX/new/.claude/hooks/orchestra-block-dangerous.py" >/dev/null 2>&1 && bad 
 ls "$FIX/new/.claude/orchestra-router.md" >/dev/null 2>&1 && bad "stale .claude/orchestra-router.md survives on the upgraded host"
 ls "$FIX/new/docs/orchestra/generate-claude-agents.py" >/dev/null 2>&1 && bad "stale docs/orchestra/generate-claude-agents.py survives on the upgraded host"
 
-for stale in flow.json briefs.md STATE.template.md; do
-  ls "$FIX/new/.cursor/skills/orchestrator/$stale" >/dev/null 2>&1 && bad "stale .cursor/skills/orchestrator/$stale survives on the upgraded host"
-done
+# (the three stale top-level orchestrator files are covered by row-2: the whole
+# mirror directory is gone on an upgraded host)
 
 # --- the CLAUDE.md routing note (A23 #2): printed only on the upgrade, never on the fresh 0.3.0 install ---
 grep -q 'host charter ## Orchestra block names a path removed in 0.4.0' "$FIX/install-new.log" || bad "install-new.log missing the stale-routing-pointer note"

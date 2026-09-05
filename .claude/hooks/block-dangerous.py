@@ -28,6 +28,10 @@ import shlex
 import subprocess
 import sys
 
+# Set True in __main__ when the payload carries worker identity (agent_id/agentId).
+# Module default False keeps the cursor adapter's bare check_command import working.
+_IS_WORKER = False
+
 ROOT = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
 
 
@@ -108,7 +112,14 @@ def gate_fresh():
             return False if headless() else None
         head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
                               text=True, timeout=5).stdout.strip()
-        return head.startswith(gate) or gate.startswith(head)
+        if head.startswith(gate) or gate.startswith(head):
+            return True
+        # PR flow (U21, 2026-09-02): the gate runs at the PR branch's tip, which
+        # is never this checkout's HEAD. Accept when the gated commit CONTAINS
+        # HEAD — the merged-tree premise scripts/fastgate.sh enforces.
+        anc = subprocess.run(["git", "merge-base", "--is-ancestor", head, gate],
+                             capture_output=True, timeout=5)
+        return anc.returncode == 0
     except Exception:
         return None
 
@@ -122,7 +133,17 @@ def pr_review_authorized():
     if gate_fresh() is not True:
         return False
     state = load_state() or {}
-    return (state.get("reviews") or {}).get("pr") == "CLEAN"
+    reviews = state.get("reviews") or {}
+    if reviews.get("pr") != "CLEAN":
+        return False
+    # B3 (2026-09-04 plans-vs-built audit): a CLEAN that exists only as narrative is
+    # unauditable. The pr-reviewer must have written a record FILE under
+    # docs/orchestra/reviews/ and state.json must name it in reviews.pr_record.
+    record = reviews.get("pr_record") or ""
+    base = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+    if not record or not os.path.isfile(os.path.join(base, record)):
+        return False
+    return True
 
 
 def analyze_git(tokens):
@@ -224,10 +245,11 @@ def check_tokens(tokens):
             landing = targets & PROTECTED
             # ONLY A LANDING NEEDS THE GATE (repaired 2026-08-31, wave D3). The
             # deny used to sit OUTSIDE this condition, so EVERY push was denied —
-            # including a push of the working line to any remote —
+            # including `git push <remote> feature`, a non-protected branch —
             # with the tell-tale empty branch list "push to protected branch ()".
-            # Pushes are UNBLOCKED and AUTOMATED agent acts (user, 2026-08-09);
-            # only a protected target is a landing.
+            # Pushes are unblocked, automated agent acts; only a protected target
+            # is a landing. The protected set is the host's, from
+            # `.orchestra/delivery.json`.
             #
             # A non-protected push falls through to None rather than a reason:
             # returning here would stop check_line's whole-line pass and leave
@@ -266,9 +288,15 @@ def check_tokens(tokens):
                 return "history rewrite while agents may hold refs (only --continue/--skip allowed)"
         elif sub == "commit" and "--amend" in flags:
             return "history rewrite while agents may hold refs"
-        elif sub == "worktree" and positional and positional[0] == "remove":
-            if "--force" in flags or "f" in short:
-                return "forced worktree removal destroys uncommitted work; inspect and rescue first"
+        elif sub == "worktree":
+            # A30 (enforced 2026-09-04, audit B4): worktrees are the ORCHESTRATOR's
+            # instrument; a worker running any worktree subcommand recreates the
+            # shared-ref-store hazards the ruling exists to prevent.
+            if _IS_WORKER and positional and positional[0] in ("add", "remove", "prune", "move"):
+                return "A30: workers never run git worktree commands — the orchestrator owns worktrees"
+            if positional and positional[0] == "remove":
+                if "--force" in flags or "f" in short:
+                    return "forced worktree removal destroys uncommitted work; inspect and rescue first"
         return None
 
     if prog == "rm":
@@ -327,6 +355,8 @@ if __name__ == "__main__":
     try:
         payload = json.load(sys.stdin)
         cmd = (payload.get("tool_input") or {}).get("command") or payload.get("command") or ""
+        # Worker identity, same two channels orchestra-block-nested.py keys on.
+        globals()["_IS_WORKER"] = bool(payload.get("agent_id") or payload.get("agentId"))
     except Exception:
         log_failure("stdin parse failure")
         cmd = None

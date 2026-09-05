@@ -1,35 +1,54 @@
-# Orchestra Roster for Claude Code and Cursor
+# Orchestra — a multi-agent operating system for coding agents
 
-A multi-agent operating system for Claude Code and Cursor: thirteen sub-agent roles, a machine-validated routing graph with three work lanes, deterministic guardrail hooks, bounded working memory, and a verified **merge-mode** installer. Orchestra's chain is design → plan → execute → audit → gates → pr-review → release → cleanup.
+Fourteen dispatch-only worker roles, a machine-validated routing graph with three work
+lanes, deterministic guardrail hooks, bounded working memory, and a verified **merge-mode**
+installer. The chain is design → plan → execute → audit → gates → pr-review → release → cleanup.
 
-The original Claude snapshot is frozen at the sibling folder `orchestra-roster`. **The reference host is SuperCRM-devops** — improvements land there first and are ported here in the batch-closing sync; this package (GitHub: `Y-B-1/orchestra`) is the portable export.
+**Four runtimes, two seats.** **Claude Code** and **Codex** may hold the orchestrator seat —
+the main session that talks to you, dispatches workers, adjudicates and merges. **Cursor** and
+**OpenCode** are worker runtimes: they take a dispatched brief and execute it. They are never
+offered the routing graph, and the package ships nothing that would let them route
+(`sync-agent-config.py --check` arm 13 fails if a Cursor orchestrator surface reappears).
+
+**Install it as a plugin, or merge it into a repo.**
+
+| Route | Command |
+|---|---|
+| Claude Code plugin | `/plugin marketplace add Y-B-1/orchestra` then `/plugin install orchestra` |
+| BB plugin (rails to every provider) | `bb plugin install github:Y-B-1/orchestra#bb-plugin` |
+| Merge into a repo (all runtimes) | `bash install.sh .` from the host repo root |
+
+**The reference host is SuperCRM-devops** — improvements land there first and are ported here in the batch-closing sync; this package (GitHub: `Y-B-1/orchestra`) is the portable export.
 
 ## What's in the box
 
 ```
 CLAUDE.md                          Host charter (the real file). AGENTS.md → CLAUDE.md
-AGENTS.md                          Symlink to CLAUDE.md (Cursor's name). Never ~/.claude/CLAUDE.md
+AGENTS.md                          Symlink to CLAUDE.md. Never ~/.claude/CLAUDE.md
 install.sh                         Merge-mode install: copies orchestra files, keeps host charter/hooks/skills
-docs/orchestra/                    Frameworks for AGENTS.md + AGENT-MEMORY.md, state.example.json, flow.html generator
+VERSION                            Package version (source of the install stamp)
+.claude-plugin/                    Claude Code plugin manifest, hook wiring, marketplace entry
+bb-plugin/                         BB plugin: injects the standing rails into EVERY provider thread
+docs/orchestra/                    Frameworks, model matrices, the generator, the install fixture proof
 docs/AGENT-MEMORY.md               Long-term index shell (how-to-fill + Current)
-.claude/                           Source runtime (Claude Code)
-  agents/                          Thirteen worker roles (dispatch-only descriptions)
+.claude/                           SOURCE runtime (Claude Code) — orchestrator seat
+  agents/                          Fourteen worker roles (dispatch-only descriptions)
   hooks/ + tests                   Guardrail hooks, each with its own .test.sh
-  skills/orchestrator/             SKILL.md (constitution) + references/ (flow.json, briefs.md, phase playbooks) + scripts/
+  skills/orchestrator/             SKILL.md (constitution) + references/ + scripts/
   skills/orchestra-rails/          Standing rails preloaded by every worker
-.cursor/                           Generated from .claude/ by docs/orchestra/sync-agent-config.py — never hand-edited
-  agents/                          Thirteen worker roles, mirrored
-  skills/orchestrator/             SKILL.md + references/ + scripts/, mirrored
-  skills/orchestra-rails/          Mirrored
-  rules/orchestra-router.mdc       alwaysApply: SUB-AGENT STOP + short non-negotiables (main session only)
-  hooks.json + hooks/              block-dangerous · block-nested-subagents · heal-orchestra-docs · session-start
-docs/flow.html                     Generated human view of flow.json (includes autonomy)
-.orchestra/delivery.json           Per-repo delivery declaration (committed)
-.orchestra/package-version         Install stamp (VERSION + git describe; committed via gitignore exception)
-VERSION                            Package version (source of the stamp)
+.codex/                            Codex runtime — orchestrator seat
+  agents/                          Seventeen worker/lane roles (.toml)
+  hooks/ + hooks.json              Package rails through run-source-hook.sh
+.cursor/                           GENERATED — WORKER runtime only
+  agents/                          FIVE worker roles: auditor, builder, red-teamer, reviewer, scout
+  skills/orchestra-rails/          Mirrored rails. NO orchestrator skill, NO router rule.
+.opencode/agents/                  GENERATED — WORKER runtime only. Five worker roles.
+.agents/skills/                    Runtime-neutral skills: orchestra-rails + codex-orchestrator
+docs/flow.html                     Generated human view of flow.json
+.orchestra/                        delivery.json (committed) + package-version stamp
 ```
 
-The **orchestrator is the main session**, taught by the orchestrator skill (pin it as a Custom Mode in Cursor; Claude Code loads it by description). Phase playbooks are `references/` files under the orchestrator skill, read by path — never skills a worker could invoke. Each worker's empty-context job **is** `.claude/agents/<role>.md` (mirrored to `.cursor/agents/<role>.md`) — Cursor does not auto-bind `skills/<role>/SKILL.md` by name; do not add a duplicate skill per role. Briefs in `references/briefs.md` are extra payload per dispatch. Workers do the work.
+The **orchestrator is the main session**, taught by the orchestrator skill, which Claude Code loads by description and Codex loads through `.agents/skills/codex-orchestrator`. Cursor and OpenCode never load it. Phase playbooks are `references/` files under the orchestrator skill, read by path — never skills a worker could invoke. Each worker's empty-context job **is** `.claude/agents/<role>.md`, mirrored per runtime to `.cursor/agents/`, `.opencode/agents/` and `.codex/agents/`. Do not add a duplicate skill per role. Briefs in `references/briefs.md` are extra payload per dispatch. Workers do the work.
 
 ## The design in five sentences
 

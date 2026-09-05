@@ -12,6 +12,7 @@ Five generated families, in a fixed write order (a partial failure stays diagnos
   3. .cursor/agents/<role>.md                  <- .claude/agents/<role>.md + the rails body
   4. .cursor/rules/<name>.mdc                  <- .claude/rules/<name>.md
   5. .cursor/skills/<skill>/**                 <- .claude/skills/<skill>/** (byte mirror + banner)
+  6. bb-plugin/skills/orchestra-rails/SKILL.md <- .claude/skills/orchestra-rails/SKILL.md (byte copy)
 
 Steps 1-2 precede 3 because --check in step 3 resolves `skills:` names against what
 steps 1-2 wrote. This script is the SOLE writer of every path above; it never reads a
@@ -55,27 +56,39 @@ CLAUDE_MATRIX: dict[str, tuple[str, str]] = {
     "scout": ("claude-sonnet-5", "low"),
 }
 
-# role -> (model field text, force_default_model, readonly). The exact 0.3.0
-# `.cursor/agents/*.md` frontmatter (UPSTREAM, verified per role).
+# role -> (model field text, force_default_model, readonly).
+# CURSOR IS A WORKER RUNTIME AND ONLY A WORKER RUNTIME. It takes a dispatched
+# ticket and executes its brief; it never routes, never fans out, never
+# orchestrates. Only roles that are actually dispatched to Cursor appear here —
+# a role with no entry generates no `.cursor/agents/<role>.md`, because an agent
+# file for a role Cursor never receives is an orphan that drifts. Coordination
+# roles (architect, planner, gatekeeper, janitor, releaser, pr-reviewer,
+# builder-max, researcher, founder-mind) are deliberately absent.
 CURSOR_MATRIX: dict[str, tuple[str, bool, bool]] = {
-    "architect": ("inherit  # judgement tier — see skills/orchestrator/models.md", False, False),
-    "auditor": ("inherit  # judgement tier — see skills/orchestrator/models.md", False, True),
-    "builder-max": ("inherit  # judgement tier — see skills/orchestrator/models.md", False, False),
-    "builder": ("grok-4.6[effort=high]", True, False),
-    "gatekeeper": ("composer-2.5[fast=false]", True, False),
-    "janitor": ("composer-2.5[fast=false]", True, False),
-    "planner": ("inherit  # judgement tier — see skills/orchestrator/models.md", False, False),
-    "pr-reviewer": ("inherit  # judgement tier — see skills/orchestrator/models.md", False, True),
-    "red-teamer": ("inherit  # judgement tier — see skills/orchestrator/models.md", False, True),
-    "releaser": ("composer-2.5[fast=false]", True, False),
-    "researcher": ("gpt-5.6-luna", True, False),
-    "reviewer": ("grok-4.6[effort=high]", True, True),
-    "scout": ("gpt-5.6-luna", True, True),
+    "auditor": ("grok-4.6[effort=high]", False, True),
+    "builder": ("grok-4.6[effort=high]", False, False),
+    "red-teamer": ("grok-4.6[effort=xhigh]", False, True),
+    "reviewer": ("grok-4.6[effort=high]", False, True),
+    "scout": ("grok-4.6[effort=high]", False, True),
 }
+
+# Skills that must NEVER be mirrored into `.cursor/`. The orchestrator skill is
+# the constitution of the main session; mirroring it hands Cursor the routing
+# graph and makes "Cursor as orchestrator" one Custom Mode away. Enforced twice:
+# step 5 skips it, and check arm 13 fails if the directory reappears.
+CURSOR_EXCLUDED_SKILLS: set[str] = {"orchestrator"}
+
+# Generated paths that must not exist at all. `orchestra-router.mdc` was the
+# alwaysApply rule that told a Cursor main session to load the orchestrator and
+# route; it is retired, not regenerated, and check arm 13 fails if it returns.
+CURSOR_FORBIDDEN_PATHS: tuple[str, ...] = (
+    ".cursor/skills/orchestrator",
+    ".cursor/rules/orchestra-router.mdc",
+)
 
 # Files inside a mirrored skill dir that are Cursor-only sources: hand-maintained,
 # exempt from both the write and the drift check.
-CURSOR_ONLY_FILES: dict[str, list[str]] = {"orchestrator": ["models.md"]}
+CURSOR_ONLY_FILES: dict[str, list[str]] = {}
 
 STANDING_RAILS_REL = os.path.join(".claude", "skills", "orchestrator", "references", "standing-rails.md")
 ORCHESTRA_RAILS_DESCRIPTION = (
@@ -200,17 +213,6 @@ def render_mirror(rel_path: str, src_bytes: bytes) -> bytes:
         banner = _hash_banner("GENERATED MIRROR", rel_path)
         return f"{shebang}{banner}\n\n{body}".encode("utf-8")
     return src_bytes
-
-
-def _insert_disable_flag(data: bytes) -> bytes:
-    text = data.decode("utf-8")
-    text, n = re.subn(
-        r"^(---\n[\s\S]*?)\n---\n",
-        r"\1\ndisable-model-invocation: true\n---\n",
-        text,
-        count=1,
-    )
-    return text.encode("utf-8") if n else data
 
 
 def render_rule_skill(name: str, rule_text: str) -> tuple[str, str]:
@@ -378,8 +380,11 @@ def run(root: str, write: bool) -> Plan:
         _, mdc_text = render_rule_skill(name, rule_bodies[name])
         plan.emit(root, os.path.join(".cursor", "rules", f"{name}.mdc"), mdc_text.encode("utf-8"), write)
 
-    # Step 5: .cursor/skills/<skill>/** mirrors.
+    # Step 5: .cursor/skills/<skill>/** mirrors. Excluded skills are never mirrored.
     for skill in skill_names(root):
+        if skill in CURSOR_EXCLUDED_SKILLS:
+            plan.notes.append(f"note: skill {skill} is Cursor-excluded — no .cursor/skills/{skill} mirror")
+            continue
         src_dir = os.path.join(root, ".claude", "skills", skill)
         dst_dir = os.path.join(root, ".cursor", "skills", skill)
         exempt = set(CURSOR_ONLY_FILES.get(skill, []))
@@ -389,8 +394,6 @@ def run(root: str, write: bool) -> Plan:
                 raw = f.read()
             source_rel = f".claude/skills/{skill}/{rel}".replace(os.sep, "/")
             content = render_mirror(source_rel, raw)
-            if skill == "orchestrator" and rel == "SKILL.md":
-                content = _insert_disable_flag(content)
             expected[rel] = content
 
         for rel, content in expected.items():
@@ -421,8 +424,21 @@ def run(root: str, write: bool) -> Plan:
                 os.remove(os.path.join(root, path))
                 print(f"removed {path}")
 
+    # Step 6: the BB plugin ships the rails to every provider BB can drive.
+    # Generated, so it can never drift from the .claude/ source.
+    rails_md = os.path.join(root, ".claude", "skills", "orchestra-rails", "SKILL.md")
+    if os.path.isfile(rails_md):
+        with open(rails_md, "rb") as f:
+            plan.emit(
+                root,
+                os.path.join("bb-plugin", "skills", "orchestra-rails", "SKILL.md"),
+                f.read(),
+                write,
+                source_rel=os.path.join(".claude", "skills", "orchestra-rails", "SKILL.md"),
+            )
+
     # Orphan census: a .cursor/skills/<dir> with no .claude/skills/<dir> source.
-    known = set(skill_names(root))
+    known = set(skill_names(root)) - CURSOR_EXCLUDED_SKILLS
     cursor_skills_dir = os.path.join(root, ".cursor", "skills")
     if os.path.isdir(cursor_skills_dir):
         for entry in sorted(os.listdir(cursor_skills_dir)):
@@ -505,6 +521,27 @@ def extra_checks(root: str) -> list[str]:
                     text = f.read()
                 if not text.startswith("---\n"):
                     problems.append(f".claude/skills/{skill}/SKILL.md: frontmatter does not start on line 1")
+
+        # Arm 13: Cursor carries no orchestrator surface. This is the mechanical
+        # half of "Cursor is a worker runtime": the ruling is only real if a
+        # regenerated tree cannot quietly grow the routing graph back.
+        for rel in CURSOR_FORBIDDEN_PATHS:
+            if os.path.exists(os.path.join(root, rel)):
+                problems.append(
+                    f"{rel}: exists — Cursor is a worker runtime and may carry no orchestrator surface"
+                )
+
+        # Arm 14: no .cursor/agents/<role>.md for a role outside CURSOR_MATRIX.
+        cursor_agents = os.path.join(root, ".cursor", "agents")
+        if os.path.isdir(cursor_agents):
+            for entry in sorted(os.listdir(cursor_agents)):
+                if not entry.endswith(".md"):
+                    continue
+                role = entry[:-3]
+                if role not in CURSOR_MATRIX:
+                    problems.append(
+                        f".cursor/agents/{entry}: role {role} is not dispatched to Cursor — orphan agent file"
+                    )
 
         # Arm 8: no .claude/skills/* entry is a symlink.
         for entry in sorted(os.listdir(skills_dir)):

@@ -43,9 +43,27 @@ Check the diff against the originating spec (pasted in your brief):
 - **Wrong-looking**: implementations that satisfy the letter but plausibly not the intent — flag with your reasoning.
 - **Scope creep**: diff content no spec line asked for.
 
+## Axis: Ledger (if assigned)
+
+<!-- Dated provenance: G9-4, spec §3.4 D5 — ruling served verbatim: "did you actually do this?
+     Did you not do that? What happened here? What do we still need to do." -->
+
+Input: one ledger pasted in your brief, plus a read-only tree. Verify each row, never the ledger's
+own prose. Never commit subjects as evidence — read the tree and re-run what the row claims.
+
+Per row, exactly one verdict:
+- **DONE-VERIFIED**: the row's `done_when` command re-run, exit code quoted — or the claimed file
+  evidence re-found in the tree.
+- **CLAIMED-NOT-FOUND**: the ledger says done; the tree disagrees.
+- **NOT-STARTED**: no evidence the row was attempted.
+- **SUPERSEDED-BY <id>**: a later row/ticket replaced this one — name it.
+
+Report: the ledger table re-emitted with a verdict column added, plus a "still to do" list drawn
+from every row not DONE-VERIFIED.
+
 ## Rules
 
-- One axis only. If the brief assigns none or both, report the malformed brief and stop.
+- One axis only. Standards, Spec, Ledger. If the brief assigns none or both, report the malformed brief and stop.
 - Do not fix anything; do not rank against the other axis (you cannot see it — that separation prevents one axis masking the other).
 - End with a one-line "worst issue on this axis" summary. Verdict: **CLEAN** or findings ranked most-severe first. Under 400 words.
 - End with: CONTEXT-GAP: <instruction, doc, or rule that would have prevented a tool failure, wrong edit, or wasted turn — or "none">.

@@ -47,8 +47,7 @@ builder can. Evidence is a command plus exit code, not a success report.
 This graph is the only process in an Orchestra host. After intake the only
 user-facing stop is unanswered frontier questions. Specs, plans, reviews,
 merges, and deploys do not wait. Maximize parallel waves. Claude workers
-live in `.claude/agents/`; the constitution is
-`.claude/skills/orchestrator/SKILL.md`; `.cursor/` is generated from it.
+live in `.claude/agents/`; do not add `.claude/skills/orchestrator/`.
 
 If this heading is missing, the heal hook appends this section. It will not
 touch **Who you are**, **Memory**, **Delivery**, or **Project rails**.

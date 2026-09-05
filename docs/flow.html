@@ -76,6 +76,10 @@
 <td class="then">reconcile BEFORE acting: compare its stamp to `git rev-parse HEAD`, `git status --porcelain`, `git worktree list`; on mismatch the TREE is truth — repair STATE.md first, then enter at its recorded state (do not also classify into another lane this turn)</td>
 </tr>
 <tr>
+<td class="if">the named plan carries the RE-PLAN ON PICKUP stamp</td>
+<td class="then">→ plan.pickup</td>
+</tr>
+<tr>
 <td class="if">the user invokes Orchestra autonomy with a NAMED trigger — &#x27;orchestra autonomy&#x27;, &#x27;run overnight&#x27;, &#x27;unattended until the ledger is done&#x27;, or &#x27;ralph&#x27;/&#x27;ralph-loop&#x27; as aliases for this loop (not a Charge script) — AND a ledger exists (docs/plans/&lt;feature&gt;-ledger.md or STATE.md ledger pointer)</td>
 <td class="then">enter autonomy.loop. Caps: user-stated, else defaults (max passes 20, consecutive no-progress 2). Overnight/asleep: announce defaults and start immediately — do not wait for a second confirmation. Ordinary &#x27;keep going&#x27; / &#x27;don&#x27;t stop&#x27; on a ticket is NOT this trigger. → autonomy.loop</td>
 </tr>
@@ -385,6 +389,7 @@
 </div>
 <div class="state"><h3>execute.ticket-loop</h3>
 <p class="q">Is there an unblocked ticket?</p>
+<div class="always">Before the first dispatch of a wave: rewrite docs/orchestra/STATE.md stamped at HEAD, line 2 `context: &lt;choice&gt;` (the boundary decision, order continue → clear → handoff → subagent → compact).</div>
 <table>
 <tr>
 <td class="if">yes (several independent → parallel, worktree rule applies)</td>
@@ -463,7 +468,7 @@
 </div>
 <div class="state"><h3>execute.wave-close</h3>
 <p class="match">match: all</p>
-<div class="always">Rewrite docs/orchestra/STATE.md (stamped).</div>
+<div class="always">Rewrite docs/orchestra/STATE.md (stamped, line 2 `context: &lt;choice&gt;`).</div>
 <div class="always">CONTEXT CHECK (boundary duty): if fill is over 40%, apply `context_discipline` before dispatching the next wave — continue / clear / handoff / subagent / compact, first yes wins.</div>
 <table>
 <tr>
@@ -562,7 +567,7 @@
 <table>
 <tr>
 <td class="if">entry</td>
-<td class="then">auditor(standards) + auditor(spec) in parallel; small diffs pasted, large diffs passed as the pinned command + file list <span class="role r-auditor">auditor:standards@L2</span><span class="role r-auditor">auditor:spec@L2</span></td>
+<td class="then">auditor(standards) + auditor(spec) in parallel; small diffs pasted, large diffs passed as the pinned command + file list <span class="role r-auditor">auditor:standards@L2</span><span class="role r-auditor">auditor:spec@L2</span><span class="role r-auditor">auditor:ledger@L2 when the closing ledger row lives in docs/plans/founder/LEDGER.md</span></td>
 </tr>
 <tr>
 <td class="if">a finding contradicts the spec</td>
@@ -621,7 +626,7 @@
 </div>
 <div class="state gate"><h3>release.deploy</h3>
 <p class="q">Did the deploy verify?</p>
-<div class="always">Execute. Do not wait for a chat OK. Push-is-deploy hosts (e.g. a host whose land branch is off `protected_branches` and whose CI deploys on push) already deployed at land.</div>
+<div class="always">Execute. Do not wait for a chat OK. Push-is-deploy hosts (e.g. main) already deployed at land.</div>
 <table>
 <tr>
 <td class="if">entry</td>
@@ -718,11 +723,13 @@
 <div class="state"><h3>autonomy.loop</h3>
 <p class="q">Unattended mode: is there an unfinished ledger item and budget left?</p>
 <div class="always">A ledger file (docs/plans/&lt;feature&gt;-ledger.md, or the path STATE.md points at) must exist; otherwise NOT-READY — autonomy cannot start without a plan.</div>
-<div class="always">Cursor may merge. A host block-pr-merge.sh rail is a defect — install.sh strips it. After pr-reviewer CLEAN the releaser lands and deploys; do not wait for a human.</div>
+<div class="always">Cursor may merge. A host block-pr-merge.sh rail is a defect — this repo removed it (pr-reviewer CLEAN authorizes land). After pr-reviewer CLEAN the releaser lands and deploys; do not wait for a human.</div>
 <div class="always">Never invent work: the loop only advances items already in the plan&#x27;s ledger. Extra ideas go to the polish queue — do not stop for the user.</div>
 <div class="always">Each pass is a fresh dispatch through the normal chain (execute.ticket-loop → execute.review → gates.fast); autonomy changes WHO decides to continue, never WHAT the roles do.</div>
 <div class="always">A ledger item flips to done only on evidence (command + exit code). Flipping without evidence is the one tamper rule.</div>
 <div class="always">CONTEXT CHECK (boundary duty): if fill is over 40%, apply `context_discipline` before dispatching the next wave — continue / clear / handoff / subagent / compact, first yes wins.</div>
+<div class="always">MULTI-PLAN RUNS: a finished plan is a wave boundary, never a run end. When this ledger completes and another plan is READY or re-plan-owed, close the batch normally then open the next plan in the SAME run. Only all-plans-done (or only user-blocked work remaining) ends the run.</div>
+<div class="always">HARNESS-DRIVEN PASSES (scripts/orca-ralph.sh — see references/autonomy-harness.md): never end a turn waiting on dispatched work — poll foreground. At the context ceiling, commit state, update STATE.md + ledger, emit `SIGIL: RECYCLE &lt;where&gt;` as the last line, and end the pass; the harness relaunches a fresh coordinator. STALLED and EXHAUSTED are the harness&#x27;s verdicts, never yours to declare early.</div>
 <table>
 <tr>
 <td class="if">no ledger file exists</td>
@@ -753,8 +760,31 @@
 <td class="then">EXHAUSTED — report what completed, what remains, and the next action</td>
 </tr>
 <tr>
-<td class="if">every ledger item is done</td>
+<td class="if">every item in THIS plan&#x27;s ledger is done and another plan is READY or re-plan-owed</td>
+<td class="then">close this batch (review.pr → land → memory update in the same commit), then open the next plan — READY plans first, then re-plans (planner → one red-team lens → execute; committed recon is reused, never re-scouted) — and continue the run ↻ autonomy.loop</td>
+</tr>
+<tr>
+<td class="if">an item is blocked on the user (a ruling, credentials, a walkthrough) or needs a gated action</td>
+<td class="then">park it in the ledger with a one-line why and advance the next unblocked item; a blocked ITEM never blocks the RUN. Only when NOTHING unblocked remains anywhere: `SIGIL: BLOCKED-USER &lt;items&gt;` (harness runs) or BLOCKED report (in-session).</td>
+</tr>
+<tr>
+<td class="if">every ledger item across every plan in the run is done</td>
 <td class="then">→ review.pr</td>
+</tr>
+<tr>
+<td class="if">the next ledger item is a founder group (a row in docs/plans/founder/LEDGER.md)</td>
+<td class="then">→ plan.pickup</td>
+</tr>
+</table>
+</div>
+</div>
+<h2>Other states</h2><div class="phase">
+<div class="state"><h3>plan.pickup</h3>
+<div class="always">Announce `flow: intake -&gt; plan.pickup (&lt;plan&gt;)`; rewrite STATE.md (stamped, line 2 `context: &lt;choice&gt;`); the founder ledger row flips to PICKING-UP.</div>
+<table>
+<tr>
+<td class="if">entry</td>
+<td class="then">scout@L2 runs the pickup-diff brief (briefs.md § pickup-scout) against the named spec; architect@L1 then runs a revision pass on the spec with the diff pasted; re-red-team per the standing lens-count ruling — no shortcut through plan.draft → plan.redteam <span class="role r-scout">scout@L2 -&gt; architect@L1</span></td>
 </tr>
 </table>
 </div>
@@ -778,7 +808,7 @@
 <li>User rulings travel verbatim — full quote only when it fits one line, else pointer; never a trimmed quote.</li>
 <li>Evidence = command + exit code (captured without pipes) or both-theme screenshots; assertions are not evidence.</li>
 <li>Worktrees only for 2+ concurrent editors; created, integrated, and removed by the orchestrator within the wave.</li>
-<li>Judgement roles (architect, planner, red-teamer, auditor, builder-max, pr-reviewer) run model: inherit — the ceiling; the rest are pinned lower at install (install.sh verifies).</li>
+<li>Model pins live in the agent frontmatter, per docs/orchestra/claude-models.md (2026-09-02): judgement roles (architect, planner, red-teamer, auditor, reviewer, pr-reviewer) run claude-fable-5 at low; builder-max is the repair valve on claude-opus-5 at medium; execution runs claude-sonnet-5. Never model: inherit.</li>
 <li>Approval boundaries: destructive git is deny. The hook never returns ask. pr-reviewer CLEAN + matching last_green_hash is merge and deploy authorization (including headless). Without CLEAN, protected landings and declared deploys are deny. The only user-facing stop after intake is design.frontier for decisions the request did not settle. Specs, plans, reviews, merges, and deploys do not wait. Full e2e is never in the execute/review/release chain.</li>
 <li>Memory lands in the batch-closing commit; stale entries are pruned, not superseded-in-place.</li>
 <li>Honest terminal states — DONE, BLOCKED, NOT-READY, NEEDS-APPROVAL; never one dressed as another.</li>

@@ -13,6 +13,20 @@ and where defined; risks; confirmed vs inferred vs not-found marked. [L2 adds: h
 .cursor/rules + AGENTS.md excerpts governing <paths>, quoted verbatim.]
 ```
 
+## pickup-scout
+
+```
+PICKUP DIFF for <spec path> at <level>. Spec written at <old HEAD>; tree is <HEAD>.
+1. LANDED: for every "What exists today" claim in §2, re-open the named file/symbol at HEAD —
+   still true / changed (quote the new state) / gone. A claim without a file is a finding.
+2. CLASHED: which tickets of §6 landed (git log + tree evidence, never commit subjects), which
+   changed the surface this spec assumes, which were superseded — by id.
+3. FOUND SINCE: entries in docs/superpowers/plans/polish-queue.md, docs/AGENT-MEMORY.md and
+   docs/audit/founder/REGISTER.md (if G10 has run) that touch this group's surface, by pointer.
+4. RULINGS: the spec's §1 verbatim vs docs/plans/RULINGS-*.md — byte-identical or a defect.
+Report: three lists + the ruling diff. No design. Trailer lines as standard.
+```
+
 ## researcher
 
 ```
@@ -118,11 +132,13 @@ a merge precondition. Trailer at end.
 ## auditor (one axis per dispatch)
 
 ```
-AXIS: <STANDARDS|SPEC> at <level>. Whole diff since <fixed point>.
+AXIS: <STANDARDS|SPEC|LEDGER> at <level>. Whole diff since <fixed point>.
 --- DIFF --- <paste if small; else: run `git diff <fp>...HEAD` + file list, read-only>
 --- <STANDARDS files | SPEC> --- <paste>
 STANDARDS: violations cite standard/smell + file + hunk + concrete fix.
 SPEC: missing (quote the line) / partial / wrong-looking (letter vs intent) / scope creep.
+LEDGER: one ledger pasted + read-only tree; per row DONE-VERIFIED / CLAIMED-NOT-FOUND /
+NOT-STARTED / SUPERSEDED-BY <id>.
 No fixes. End with the worst issue on this axis. CLEAN or ranked findings.
 ```
 

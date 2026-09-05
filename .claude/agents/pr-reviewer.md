@@ -27,6 +27,11 @@ do ONLY that lens's categories and skip the walkthrough unless the brief
 asks for it (the orchestrator gets it from the correctness lens). With no
 lens, cover all categories in one pass (single mode).
 
+**Standing security lens.** `SECURITY_LENS_PATHS`: `api/src/auth/**`,
+`api/src/functions/**`, `.claude/hooks/**`, `azure-pipelines*.yml`,
+`staticwebapp.config.json`, `api/host.json`. A diff that touches any of these
+runs `LENS: security` in addition to whatever lens the brief named; a CLEAN without it is not CLEAN.
+
 ## Finding discipline
 
 - **Bug findings carry a failure scenario.** Every Critical/Major states
@@ -50,9 +55,7 @@ Categories (skip any the brief says is out of scope; do not invent product requi
    logs, unsafe deserialization, path traversal, SSRF and unvalidated
    outbound requests, crypto misuse (home-rolled, weak modes, bad
    randomness), PII exposure (logs, responses, analytics), unsafe defaults
-   (permissive CORS, debug on, open redirects). Prioritize by security
-   surfaces: the host repo's auth/input/network/secrets paths; list them
-   in the host charter.
+   (permissive CORS, debug on, open redirects).
    **Signal filter:** report only findings with a plausible exploit path
    from an attacker-reachable surface. Do not report: denial-of-service or
    rate-limiting concerns, vulnerabilities in dependencies the diff did not

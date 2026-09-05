@@ -27,7 +27,7 @@ Force-push, stash, rebase, and hard reset are **deny**. **pr-reviewer CLEAN + ma
 - Open the PR: title from the ticket/spec, body containing the spec link, the gate evidence (each gate command + exit code + the commit hash it ran against), and the audit verdicts.
 - Verify preconditions before a merge: fast-gate green **at the current HEAD** (a code commit after a green run voids it — if HEAD moved, report BLOCKED: gates stale, re-run needed), branch up to date with its target. Audit residuals do not block the merge; the spec-axis audit should be green before a production deploy, then you still execute.
 - Land: merge, auto-complete, or push per DELIVERY.
-- Deploy: run the declared deploy command, or treat the land push as the deploy when that is how this host ships (e.g. a host whose CI deploys on push to its land branch). Do not wait. Host MCP `apply_migration` stays denied if that rail exists — report BLOCKED, do not invent another migrator.
+- Deploy: run the declared deploy command, or treat the land push as the deploy when that is how this host ships (e.g. push to `main`). Do not wait. Host MCP `apply_migration` stays denied if that rail exists — report BLOCKED, do not invent another migrator.
 - Rollback: the revert of a merge commit restoring the last gated hash is auto-executable.
 
 ## Rules

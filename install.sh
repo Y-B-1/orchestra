@@ -10,7 +10,9 @@ bad() { say "FAIL: $*"; FAIL=1; }
 SRC="$(cd "$(dirname "$0")" && pwd)"
 DST="$(pwd)"
 
-ORCHESTRA_SKILLS="orchestrator"
+# Cursor-mirrored skills. `orchestrator` is deliberately ABSENT: Cursor is a
+# worker runtime and may not carry the routing graph (0.6.0).
+ORCHESTRA_SKILLS="orchestra-rails"
 ORCHESTRA_HOOKS="block-dangerous.py block-nested-subagents.py heal-orchestra-docs.py session-start.py"
 # Six travelling .claude/hooks/*.py + their .test.sh (routing-context.md has no test — it's data).
 CLAUDE_HOOKS="block-dangerous.py orchestra-block-nested.py orchestra-session-start.py heal-orchestra-docs.py orchestra-block-worker-skill.py orchestra-worker-context.py"
@@ -38,7 +40,7 @@ merge_copy() {
   for legacy in design plan execute diagnose audit gates release cleanup pr-review; do
     if [ -d "$DST/.cursor/skills/$legacy" ]; then
       rm -rf "$DST/.cursor/skills/$legacy"
-      say "  note: removed legacy .cursor/skills/$legacy (playbook lives at .cursor/skills/orchestrator/references/$legacy.md since 0.4.0)"
+      say "  note: removed legacy .cursor/skills/$legacy (playbook lives at .claude/skills/orchestrator/references/$legacy.md since 0.4.0)"
     fi
   done
   # cp -R never prunes: a 0.3.0 host's top-level orchestrator/{flow.json,briefs.md,
@@ -54,13 +56,54 @@ merge_copy() {
     mkdir -p "$DST/.cursor/skills/orchestra-rails"
     cp -R "$SRC/.cursor/skills/orchestra-rails/." "$DST/.cursor/skills/orchestra-rails/"
   fi
-  cp "$SRC/.cursor/rules/orchestra-router.mdc" "$DST/.cursor/rules/orchestra-router.mdc"
+  # RETIRED 0.6.0 — Cursor is a worker runtime and is never offered the orchestrator.
+  if [ -e "$DST/.cursor/rules/orchestra-router.mdc" ]; then
+    rm -f "$DST/.cursor/rules/orchestra-router.mdc"
+    say "  note: removed .cursor/rules/orchestra-router.mdc (Cursor is a worker runtime since 0.6.0)"
+  fi
+  if [ -d "$DST/.cursor/skills/orchestrator" ]; then
+    rm -rf "$DST/.cursor/skills/orchestrator"
+    say "  note: removed .cursor/skills/orchestrator (Cursor is a worker runtime since 0.6.0)"
+  fi
+  for orphan in architect builder-max founder-mind gatekeeper janitor planner pr-reviewer releaser researcher; do
+    if [ -f "$DST/.cursor/agents/$orphan.md" ]; then
+      rm -f "$DST/.cursor/agents/$orphan.md"
+      say "  note: removed .cursor/agents/$orphan.md (role not dispatched to Cursor since 0.6.0)"
+    fi
+  done
   for h in $ORCHESTRA_HOOKS; do
     cp "$SRC/.cursor/hooks/$h" "$DST/.cursor/hooks/$h"
   done
+  # Runtime-neutral skills root — the copy every non-Claude runtime finds, and
+  # the only home of the Codex orchestrator seat.
+  if [ -d "$SRC/.agents/skills" ]; then
+    mkdir -p "$DST/.agents/skills"
+    cp -R "$SRC/.agents/skills/." "$DST/.agents/skills/"
+  fi
+  # Codex runtime: worker definitions + package-rail hooks. Codex may orchestrate.
+  if [ -d "$SRC/.codex" ]; then
+    mkdir -p "$DST/.codex/agents" "$DST/.codex/hooks"
+    cp -R "$SRC/.codex/agents/." "$DST/.codex/agents/"
+    cp -R "$SRC/.codex/hooks/." "$DST/.codex/hooks/"
+    [ -f "$SRC/.codex/AGENTS-NOTE.md" ] && cp "$SRC/.codex/AGENTS-NOTE.md" "$DST/.codex/AGENTS-NOTE.md"
+    if [ -f "$DST/.codex/hooks.json" ]; then
+      say "  note: kept host .codex/hooks.json (package rows live in the package copy)"
+    else
+      cp "$SRC/.codex/hooks.json" "$DST/.codex/hooks.json"
+    fi
+  fi
+  # OpenCode runtime: worker definitions only. OpenCode never orchestrates.
+  if [ -d "$SRC/.opencode/agents" ]; then
+    mkdir -p "$DST/.opencode/agents"
+    cp -R "$SRC/.opencode/agents/." "$DST/.opencode/agents/"
+  fi
   if [ -d "$SRC/docs/orchestra" ]; then
     cp -R "$SRC/docs/orchestra/." "$DST/docs/orchestra/"
   fi
+  # Python bytecode is machine- and version-specific and must never travel,
+  # whatever state the source checkout happens to be in.
+  find "$DST/.claude" "$DST/.cursor" "$DST/.codex" "$DST/docs" -name '__pycache__' -prune -exec rm -rf {} + 2>/dev/null || true
+  find "$DST/.claude" "$DST/.cursor" "$DST/.codex" "$DST/docs" -name '*.pyc' -delete 2>/dev/null || true
   if [ -f "$SRC/docs/flow.html" ]; then
     mkdir -p "$DST/docs"
     cp "$SRC/docs/flow.html" "$DST/docs/flow.html"
@@ -372,7 +415,13 @@ if os.path.isfile(".orchestra/state.json"):
     except Exception:
         state = {}
 state.setdefault("gates", {})["last_green_hash"] = head
-state.setdefault("reviews", {})["pr"] = "CLEAN"
+reviews = state.setdefault("reviews", {})
+reviews["pr"] = "CLEAN"
+record_rel = "docs/orchestra/reviews/install-self-test.md"
+os.makedirs(os.path.dirname(record_rel), exist_ok=True)
+with open(record_rel, "w") as _f:
+    _f.write("# install.sh self-test review record\n\nCLEAN - synthetic record for the guard self-test.\n")
+reviews["pr_record"] = record_rel
 json.dump(state, open(".orchestra/state.json", "w"), indent=2)
 PY
 out=$(echo '{"command":"gh pr merge 42 --squash"}' | CURSOR_CLOUD_AGENT=1 ./.cursor/hooks/block-dangerous.py)
@@ -415,7 +464,13 @@ if os.path.isfile(".orchestra/state.json"):
     except Exception:
         state = {}
 state.setdefault("gates", {})["last_green_hash"] = head
-state.setdefault("reviews", {})["pr"] = "CLEAN"
+reviews = state.setdefault("reviews", {})
+reviews["pr"] = "CLEAN"
+record_rel = "docs/orchestra/reviews/install-self-test.md"
+os.makedirs(os.path.dirname(record_rel), exist_ok=True)
+with open(record_rel, "w") as _f:
+    _f.write("# install.sh self-test review record\n\nCLEAN - synthetic record for the guard self-test.\n")
+reviews["pr_record"] = record_rel
 json.dump(state, open(".orchestra/state.json", "w"), indent=2)
 PY
 out=$(echo '{"command":"vercel deploy --prod"}' | CURSOR_CLOUD_AGENT=1 ./.cursor/hooks/block-dangerous.py)
@@ -506,18 +561,24 @@ else
 fi
 rm -rf "$heal_tmp"
 
-say "== 4. Model pinning (judgement inherit; the rest pinned + force-default-model)"
-for f in builder reviewer gatekeeper releaser scout researcher janitor; do
-  grep -q '^model: inherit' ".cursor/agents/$f.md" && bad "$f.md is 'model: inherit' — pin a tier id (see .cursor/skills/orchestrator/models.md)"
-  grep -q '^force-default-model: true' ".cursor/agents/$f.md" || bad "$f.md missing force-default-model: true (Task inherit would override YAML)"
+say "== 4. Cursor worker model pinning (workers only; no force-default-model)"
+# `force-default-model` is deliberately ABSENT since 0.6.0: a Cursor worker's
+# model comes from `worker-start --model`, and pinning it here blocks the
+# fallback rung. What must hold is that every generated file names a role
+# Cursor is actually dispatched, and carries a pinned model.
+for f in .cursor/agents/*.md; do
+  [ -f "$f" ] || continue
+  r=$(basename "$f" .md)
+  case " auditor builder red-teamer reviewer scout " in
+    *" $r "*) : ;;
+    *) bad ".cursor/agents/$r.md: role $r is not dispatched to Cursor (orphan)" ;;
+  esac
+  grep -q '^model: inherit' "$f" && bad "$r.md is 'model: inherit' — pin a tier id (see docs/orchestra/cursor-models.md)"
+  grep -q '^model:' "$f" || bad "$r.md missing model:"
+  grep -q '^force-default-model: true' "$f" && bad "$r.md sets force-default-model — worker-start --model must stay able to move a fallback rung"
 done
-say "  note: shipped defaults assume grok-4.6 / composer-2.5 / gpt-5.6-luna are on your plan."
-say "  Confirm in Cursor's model picker; YAML model: is what Cursor honors — see models.md."
-for f in architect planner red-teamer auditor builder-max pr-reviewer; do
-  grep -q '^model: inherit' ".cursor/agents/$f.md" || say "note: $f.md not 'inherit' — intentional?"
-  grep -q '^force-default-model: true' ".cursor/agents/$f.md" && bad "$f.md is judgement — must not set force-default-model (session ceiling inherit)"
-done
-grep -q '^is_background: true' .cursor/agents/researcher.md && bad "researcher.md must not force is_background: true (intake Q&A is foreground)"
+say "  note: shipped defaults assume the grok-4.6 family is on your plan."
+say "  Confirm in Cursor's model picker; YAML model: is what Cursor honors — see docs/orchestra/cursor-models.md."
 
 say "== 4c. Claude layer + Cursor mirror drift (sync-agent-config.py --check)"
 [ -f .claude/skills/orchestrator/SKILL.md ] || bad "orchestrator skill missing from .claude/skills/ (Claude is the source since 0.4.0)"
@@ -645,35 +706,36 @@ if [ "$SRC" = "$DST" ]; then
     | grep -v '^docs/orchestra/fixtures/')
   [ -z "$host_hits" ] || { bad "host string leaked into the package:"; printf '%s\n' "$host_hits"; }
   unset _p1 _p2 _p3 _p4 _p5 _p6 _p7 _p8 _p9 _p10 _p11 _p12 _p13 _p14 host_pattern host_hits
-  # A24: .cursor/skills/orchestrator/models.md is CURSOR_ONLY, hand-maintained
-  # data, but its family name is now the pinned claude-fable-5-1 like every
-  # other reference — the grep below is literal, no exclusion for this file.
-  _m1="claude-fable-"; _m2="5"
-  model_pattern="${_m1}${_m2}"
-  stray_ids=$(grep -rnw "$model_pattern" .claude .cursor install.sh 2>/dev/null \
-    | grep -v 'claude-fable-5-1')
-  [ -z "$stray_ids" ] || { bad "bare claude-fable-5 id (want the pinned claude-fable-5-1):"; printf '%s\n' "$stray_ids"; }
-  unset _m1 _m2 model_pattern stray_ids
-  # OPUS-0 (equitihub RULINGS-2026-09-02-founder.md): Opus is retired
-  # everywhere. A hit is allowed only on a line documenting the retirement
-  # itself — never one that names Opus as a live choice.
-  _o1="op"; _o2="us"
-  opus_pattern="${_o1}${_o2}"
-  opus_hits=$(grep -rniw "$opus_pattern" .claude .cursor CLAUDE.md README.md docs/orchestra/claude-models.md 2>/dev/null \
-    | grep -viE 'retired|2026-08-31|OPUS-0')
-  [ -z "$opus_hits" ] || { bad "Opus named outside a retirement note (OPUS-0):"; printf '%s\n' "$opus_hits"; }
+  # arm 14 (0.6.0): the pinned judgement id is claude-fable-5. The generation is
+  # what Orchestra pins; a dated point-release suffix is not the contract, and a
+  # bare alias (`fable`) is what must never appear.
+  _m1="fab"; _m2="le"
+  alias_ids=$(grep -rnwE "(model|effort): *${_m1}${_m2}" .claude .cursor .codex .opencode 2>/dev/null)
+  [ -z "$alias_ids" ] || { bad "bare model alias (want the pinned claude-fable-5 id):"; printf '%s\n' "$alias_ids"; }
+  unset _m1 _m2 alias_ids
+  # OPUS-1 (supersedes OPUS-0, U15): Opus has exactly ONE seat — builder-max, the
+  # repair valve, which fires only after a Sonnet build returns findings. Any
+  # OTHER role naming Opus is the defect this arm catches.
+  _o1="claude-op"; _o2="us-5"
+  opus_roles=$(grep -rlw "${_o1}${_o2}" .claude/agents .cursor/agents .codex/agents .opencode/agents 2>/dev/null \
+    | grep -v 'builder-max')
+  [ -z "$opus_roles" ] || { bad "Opus named outside builder-max (U15: one repair valve, no other Opus rung):"; printf '%s\n' "$opus_roles"; }
+  unset _o1 _o2 opus_roles
   unset _o1 _o2 opus_pattern opus_hits
 else
   say "== 4e. No host string leaked / no bare model id — skipped: installing into a host, not the package self-test"
 fi
 
-say "== 4b. Phase skill locked (disable-model-invocation); main-session SKILL.md is not"
+say "== 4b. Cursor carries workers only; the main-session SKILL.md stays visible"
 [ -f "$SRC/VERSION" ] || bad "package VERSION file missing at $SRC/VERSION"
 for skill in $ORCHESTRA_SKILLS; do
   f=".cursor/skills/$skill/SKILL.md"
   [ -f "$f" ] || { bad "missing skill $f"; continue; }
-  grep -q '^disable-model-invocation: true' "$f" || bad "$f missing disable-model-invocation: true (workers must not auto-load orchestrator playbooks)"
 done
+# Cursor is a WORKER runtime (0.6.0). These are the surfaces that would hand it
+# the orchestrator seat, so their ABSENCE is the invariant, checked directly.
+[ -e ".cursor/skills/orchestrator" ] && bad ".cursor/skills/orchestrator exists — Cursor may not carry the routing graph"
+[ -e ".cursor/rules/orchestra-router.mdc" ] && bad ".cursor/rules/orchestra-router.mdc exists — that rule made a Cursor main session route"
 # Inverse invariant: the Claude SKILL.md the MAIN SESSION loads by description
 # must NOT carry the flag — that flag is what would make it invisible to the
 # session that is supposed to load it (mutation: add it — the main session
@@ -683,7 +745,7 @@ grep -q '^disable-model-invocation: true' .claude/skills/orchestrator/SKILL.md &
 say "== 5. Graph + reference consistency"
 python3 - <<'PY' || FAIL=1
 import json, re, os, sys
-d = json.load(open('.cursor/skills/orchestrator/references/flow.json'))
+d = json.load(open('.claude/skills/orchestrator/references/flow.json'))
 s = set(d['states']); roles = set(d['roles']); ok = True
 if (d.get('states') or {}).get('intake', {}).get('match') != 'first':
     print("FAIL: intake.match must be 'first' (exclusive classification)")
@@ -702,11 +764,11 @@ for role, path in d['roles'].items():
 for dead in ('scout-recon', 'research', 'red-team', 'build-wave', 'review-gate',
              'design', 'plan', 'execute', 'diagnose', 'audit', 'gates', 'release', 'cleanup', 'pr-review'):
     if os.path.isdir(f'.cursor/skills/{dead}'): print(f"FAIL: retired skill present: {dead}"); ok = False
-if not os.path.exists('.cursor/skills/orchestrator/references/briefs.md'): print("FAIL: briefs.md missing"); ok = False
+if not os.path.exists('.claude/skills/orchestrator/references/briefs.md'): print("FAIL: briefs.md missing"); ok = False
 if 'review.pr' not in s: print("FAIL: missing review.pr state"); ok = False
 if 'pr-reviewer' not in roles: print("FAIL: missing pr-reviewer role"); ok = False
-if not os.path.exists('.cursor/skills/orchestrator/references/pr-review.md'): print("FAIL: pr-review playbook missing"); ok = False
-briefs = open('.cursor/skills/orchestrator/references/briefs.md').read() if os.path.exists('.cursor/skills/orchestrator/references/briefs.md') else ''
+if not os.path.exists('.claude/skills/orchestrator/references/pr-review.md'): print("FAIL: pr-review playbook missing"); ok = False
+briefs = open('.claude/skills/orchestrator/references/briefs.md').read() if os.path.exists('.claude/skills/orchestrator/references/briefs.md') else ''
 if '## pr-reviewer' not in briefs: print("FAIL: briefs.md missing ## pr-reviewer"); ok = False
 sys.exit(0 if ok else 1)
 PY

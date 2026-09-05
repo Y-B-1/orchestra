@@ -1,0 +1,19 @@
+{
+  "name": "bb-plugin-orchestra",
+  "version": "0.6.0",
+  "type": "module",
+  "private": false,
+  "description": "Carries the Orchestra standing rails into every BB provider thread.",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/Y-B-1/orchestra.git", "directory": "bb-plugin" },
+  "bb": {
+    "name": "Orchestra Rails",
+    "description": "Injects the Orchestra standing rails into every provider thread — Claude Code, Codex, Cursor, OpenCode, Grok, Pi — so a worker carries the discipline even when its brief never restates it.",
+    "branding": { "icon": "Workflow" },
+    "server": "./server.ts",
+    "skills": ["skills"]
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "*"
+  }
+}

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Claude SessionStart: heal charter/memory, remind the main session to route.
 
-Workers get no orchestrator identity (see the WHO IS THIS? note below). The main
-session is pointed at the PROJECT skill, `.claude/skills/orchestrator/`.
+Workers get no orchestrator identity — neither a Claude sub-agent (see the WHO IS
+THIS? note below) nor an ORCA-DISPATCHED worker (see IS THIS AN ORCA WORKER?). The
+main session is pointed at the PROJECT skill, `.claude/skills/orchestrator/`.
 
 THIS HOOK IS NO LONGER THE ONLY CHANNEL, and that is the point. Until 2026-09-01
 it was: the skill lived under `.cursor/skills/`, which Claude Code does not scan,
@@ -154,6 +155,36 @@ def doctor_reminder():
     )
 
 
+LOCKED_MODEL = "claude-fable-5"
+LOCKED_EFFORT = "low"
+
+
+def model_status():
+    """MODEL-GUARD (ruling docs/plans/RULINGS-2026-09-02-founder.md U11): print
+    one loud confirmation line every session, whether the model came in on the
+    payload or has to be read from settings.json — the routing block above
+    cannot hide it, and a stale/wrong value is visible on every boot, not just
+    on the switches guard-model.py catches."""
+    model = payload.get("model") or payload.get("current_model")
+    effort = None
+    eff = payload.get("effort")
+    if isinstance(eff, dict):
+        effort = eff.get("level")
+    source = "payload"
+    if not model:
+        source = "settings.json"
+        try:
+            with open(os.path.join(root, ".claude", "settings.json")) as f:
+                settings = json.load(f)
+            model = settings.get("model")
+            effort = settings.get("effortLevel")
+        except Exception as e:
+            return f"[model] main session: could not read model — {type(e).__name__}"
+    ok = model == LOCKED_MODEL and effort == LOCKED_EFFORT
+    verdict = "matrix OK" if ok else "VIOLATION"
+    return f"[model] main session: {model} / effort {effort} — {verdict} (from {source})"
+
+
 def routing_context():
     """Inject the routing constitution verbatim (R1) — the deterministic half
     of routing. Missing/empty is never a silent no-op (R2): it reddens loudly
@@ -167,19 +198,6 @@ def routing_context():
     if not text:
         return f"ROUTING-CONTEXT MISSING: {path} is missing or empty."
     return text
-
-
-def host_routing_context():
-    """Optional per-host addendum, injected verbatim after the package block.
-    Absent is the normal case — most hosts carry no host-specific routing
-    text — so a missing file is silent, never a warning."""
-    path = os.path.join(root, ".claude", "hooks", "routing-context.host.md")
-    try:
-        with open(path) as f:
-            text = f.read().strip()
-    except Exception:
-        return None
-    return text or None
 
 # WHO IS THIS? The same two channels `orchestra-block-nested.py` keys on, and for
 # the same reason it was fixed on 2026-08-31: `agent_type` is the LABEL and is
@@ -199,6 +217,46 @@ if worker:
     print("{}")
     sys.exit(0)
 
+# IS THIS AN ORCA WORKER? A dispatched Orca worker is a FULL Claude Code session,
+# not a sub-agent, so none of the payload fields above are set — and until this
+# check existed every worker was handed the orchestrator identity block and told
+# to dispatch workers of its own. The block is wrong for a worker twice over: it
+# names a role the worker does not hold, and it invites a fan-out at depth 1.
+#
+# THE MARKER IS ORCA'S OWN LAUNCH ENVIRONMENT, observed 2026-09-02 on this
+# machine against `orca orchestration worker-list` as the ground truth:
+#   · a supervised worker pane carries ORCA_WORKTREE_ID and NOT ORCA_WORKSPACE_ID
+#     (two samples: this dispatch in a child worktree, and term_7f6b9537 dispatched
+#     with `--worktree current` into the main checkout — both in worker-list);
+#   · the coordinator pane carries BOTH (term_3d3a1f3f, absent from worker-list).
+# The cwd heuristic alone would have missed the `--worktree current` worker, which
+# is why the pair is read rather than the path.
+#
+# FAILURE DIRECTION, stated on purpose: if Orca ever stops setting
+# ORCA_WORKSPACE_ID on the coordinator pane, the main session loses this
+# REMINDER — not its routing. The skill carries its own model-invocable
+# `description` and SKILL.md keeps the SUB-AGENT STOP header, so routing has two
+# further channels; a worker wrongly told to orchestrate has none.
+def orca_worker() -> bool:
+    """True when this session is an Orca-dispatched worker pane."""
+    if not os.environ.get("ORCA_WORKTREE_ID"):
+        return False  # not an Orca pane at all
+    return not os.environ.get("ORCA_WORKSPACE_ID")
+
+
+if orca_worker():
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "SessionStart",
+            "additionalContext": (
+                "Orca worker session — execute the brief your coordinator dispatched. "
+                "Do NOT load the `orchestrator` skill and do NOT dispatch workers "
+                "(depth 1). Report with `orca orchestration send --type worker_done`."
+            ),
+        }
+    }))
+    sys.exit(0)
+
 # WHY THE OLD "Do not add `.claude/skills/orchestrator/`" SENTENCE EXISTED, and why
 # it is gone (2026-09-01). It was a MIRROR-DRIFT rule, not a routing rule: a second
 # hand-maintained copy of the orchestrator under `.claude/` would drift silently
@@ -216,7 +274,7 @@ if worker:
 ctx = (
     "Orchestra main session (Claude Code). Load the `orchestrator` skill — "
     "`.claude/skills/orchestrator/SKILL.md` — and route via its `references/flow.json`, "
-    "read one state at a time with `scripts/flow-state.py`. Workers: `.claude/agents/`. "
+    "read one state at a time with `.claude/skills/orchestrator/scripts/flow-state.py`. Workers: `.claude/agents/`. "
     "Models: `docs/orchestra/claude-models.md`. After intake the only user-facing stop "
     "is unanswered frontier questions. Maximize parallelism: dispatch every unblocked "
     "ticket whose files do not overlap, in one message — including current waves from "
@@ -224,18 +282,14 @@ ctx = (
 )
 
 # R1/R2: inject the routing constitution itself (deterministic), not a pointer.
-# The optional host addendum (`routing-context.host.md`) follows the package
-# block verbatim when present; a host with none gets no marker at all.
 parts = [ctx, routing_context()]
-host_ctx = host_routing_context()
-if host_ctx:
-    parts.append(host_ctx)
 if heal_warning:
     parts.append(f"[heal] {heal_warning}")
 parts.append(upstream_drift())
 doctor_warning = doctor_reminder()
 if doctor_warning:
     parts.append(doctor_warning)
+parts.append(model_status())
 
 print(json.dumps({
     "hookSpecificOutput": {

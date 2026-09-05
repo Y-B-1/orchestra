@@ -4,6 +4,7 @@ Goal: `docs/plans/YYYY-MM-DD-<feature>.md`, red-teamed and committed, plus its s
 
 ## Mechanics
 
+0. **Pickup**: a plan stamped RE-PLAN ON PICKUP enters `plan.pickup` first — scout diff, architect revision, red team; never straight to draft.
 1. **Recon only for gaps**: dispatch a scout when design recon left questions open, when ticket briefs need the path-rule harvest (`.cursor/rules` + AGENTS.md excerpts for touched paths, quoted verbatim), or when design happened in another session. Otherwise carry design's recon forward and say so in the plan.
 2. **Research join**: version-sensitive tickets cite `RESEARCH.md` on disk. The planner marks tickets BLOCKED-ON-RESEARCH rather than guessing; check the file exists before red team.
 3. **Draft**: planner (brief: `briefs.md#planner`) from spec + recon + research. Demand a wave map and exclusive file lists that maximize concurrent builders. If independent tickets were listed as a sequence, send it back. On return: review the ticket summary table, diff quoted rulings against your record, adjudicate Open questions against the original request (ask only if a frontier gap remains) before red team.

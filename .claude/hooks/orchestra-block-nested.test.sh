@@ -14,8 +14,8 @@
 #
 # Run:  bash .claude/hooks/orchestra-block-nested.test.sh
 set -u
-H="$(dirname "$0")/orchestra-block-nested.py"
-[ -f "$H" ] || { echo "hook not found next to this test" >&2; exit 1; }
+H=./.claude/hooks/orchestra-block-nested.py
+[ -f "$H" ] || { echo "run from the repo root" >&2; exit 1; }
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
@@ -62,6 +62,35 @@ echo
 echo "=== fails OPEN, never bricks the session ==="
 t allow 'not json at all' "unparseable stdin"
 t allow '{}' "empty object"
+
+echo
+echo "=== MODEL-GUARD: a dispatch-time model/effort override is denied ==="
+t deny '{"tool_name":"Agent","tool_input":{"subagent_type":"builder","model":"claude-wrong-tier-5"}}' \
+  "model override on an otherwise clean builder dispatch"
+t deny '{"tool_name":"Agent","tool_input":{"subagent_type":"builder","effort":"high"}}' \
+  "effort override on an otherwise clean builder dispatch"
+t allow '{"tool_name":"Agent","tool_input":{"subagent_type":"builder"}}' \
+  "clean dispatch — no override, on-matrix role"
+
+echo
+echo "=== MODEL-GUARD: an off-matrix agent FILE is denied at dispatch time ==="
+# Sandboxed — never write a fixture into the real .claude/agents/ (not this
+# ticket's file), same convention as orchestra-session-start.test.sh's sandbox().
+SBOX=$(mktemp -d)
+mkdir -p "$SBOX/.claude/agents"
+printf -- '---\nname: builder\nmodel: claude-wrong-tier-5\neffort: high\n---\n' > "$SBOX/.claude/agents/builder.md"
+got=$(printf '%s' '{"tool_name":"Agent","tool_input":{"subagent_type":"builder"}}' \
+      | CLAUDE_PROJECT_DIR="$SBOX" python3 "$H" 2>/dev/null \
+      | python3 -c 'import json,sys; print(json.load(sys.stdin)["hookSpecificOutput"]["permissionDecision"])' 2>/dev/null)
+[ -n "$got" ] || got="(no decision)"
+if [ "$got" = deny ]; then pass=$((pass+1)); printf "  ok    %-5s %s\n" "$got" "builder.md drifted to wrong-tier-5/high"
+else fail=$((fail+1)); printf "  FAIL  %-5s (wanted deny) %s\n" "$got" "builder.md drifted to wrong-tier-5/high"; fi
+rm -rf "$SBOX"
+
+echo
+echo "=== MODEL-GUARD: escape hatch bypasses both new checks ==="
+ORCHESTRA_MODEL_UNLOCK=1 t allow '{"tool_name":"Agent","tool_input":{"subagent_type":"builder","model":"claude-wrong-tier-5"}}' \
+  "override allowed with the escape hatch set"
 
 echo
 echo "  $pass passed, $fail failed"

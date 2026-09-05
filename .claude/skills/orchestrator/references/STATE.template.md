@@ -1,4 +1,5 @@
 # STATE — <project> (written-at: <ISO timestamp> @ <git HEAD short hash>)
+context: <continue|clear|handoff|subagent|compact>
 
 ## Run
 - status: <OPEN | idle>
@@ -21,3 +22,4 @@
 - memory: docs/AGENT-MEMORY.md — load sections on demand, never wholesale
 - research: <RESEARCH.md path + expiry, or —>
 - last full-suite run: <date + result pointer, or —>
+- founder ledger: docs/plans/founder/LEDGER.md
